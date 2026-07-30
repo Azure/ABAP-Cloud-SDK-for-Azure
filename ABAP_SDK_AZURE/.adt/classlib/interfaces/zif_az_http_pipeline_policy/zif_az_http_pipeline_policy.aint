@@ -1,0 +1,12 @@
+INTERFACE zif_az_http_pipeline_policy PUBLIC.
+
+  METHODS process
+    IMPORTING
+      io_request TYPE REF TO zcl_az_http_request
+      io_context TYPE REF TO zcl_az_pipeline_context
+    RETURNING
+      VALUE(ro_response) TYPE REF TO zcl_az_http_response
+    RAISING
+      zcx_az_http_error.
+
+ENDINTERFACE.

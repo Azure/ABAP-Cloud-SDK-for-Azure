@@ -1,0 +1,118 @@
+﻿CLASS zcl_az_demo_rg_quer DEFINITION
+
+PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+    INTERFACES if_oo_adt_classrun.
+
+ENDCLASS.
+
+
+CLASS zcl_az_demo_rg_quer IMPLEMENTATION.
+
+METHOD if_oo_adt_classrun~main.
+
+    TRY.
+
+        "------------------------------------------------------
+        " Create Azure Credential
+        "------------------------------------------------------
+        DATA(lo_credential) =
+            NEW zcl_az_client_secret_cred(
+                iv_client_id =
+                     '<YOUR_CLIENT_ID>'
+
+                iv_client_secret =
+                    '<YOUR_CLIENT_SECRET>'
+
+                iv_tenant_id =
+                    '<YOUR_TENANT_ID>'
+                    ).
+
+        out->write( 'Credential created' ).
+
+        "------------------------------------------------------
+        " Create Resource Graph Client
+        "------------------------------------------------------
+        DATA(lo_rg_client) =
+            NEW zcl_az_resourcegraph_client(
+                io_credential = lo_credential ).
+
+        out->write( 'ResourceGraphClient created' ).
+
+        DATA lt_subscriptions TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+        APPEND '<YOUR_SUBSCRIPTION_ID>' TO lt_subscriptions.
+
+        "======================================================"
+        " 1) Ergonomic facade: query_resources( )
+        "    Primitives in, OO zcl_az_rg_query_result out.
+        "======================================================"
+        out->write( |--- 1) query_resources (ergonomic facade) ---| ).
+
+        DATA(lo_result) =
+            lo_rg_client->query_resources(
+                iv_query         = `Resources | project name, type, location | limit 5`
+                it_subscriptions = lt_subscriptions ).
+
+        out->write(
+          |Count: { lo_result->mv_count } / TotalRecords: { lo_result->mv_total_records }| ).
+
+        LOOP AT lo_result->mt_rows INTO DATA(lv_row).
+          out->write( |Row: { lv_row }| ).
+        ENDLOOP.
+
+        "======================================================"
+        " 2) Full generated surface: resources( body )
+        "    Typed query_request in, typed query_response out
+        "    (exposes total_records, skip_token, facets, ...).
+        "======================================================"
+        out->write( |--- 2) resources( body ) (typed request/response) ---| ).
+
+        DATA ls_body TYPE zif_az_resourcegraph_service=>query_request.
+        ls_body-subscriptions = lt_subscriptions.
+        ls_body-query         = `Resources | project name, type | limit 3`.
+        ls_body-options-_top  = 3.
+
+        DATA(ls_resources) =
+            lo_rg_client->resources(
+                api_version = '2024-04-01'
+                body        = ls_body ).
+
+        out->write(
+          |HTTP { ls_resources-code } | &&
+          |/ TotalRecords: { ls_resources-_200_app_json-total_records } | &&
+          |/ Count: { ls_resources-_200_app_json-count }| ).
+        " NOTE: _200_app_json-data is blank because Azure returns `data` as a JSON
+        " ARRAY while the generated type is `data TYPE string` (a JSON array can't
+        " be deserialized into a string). The full payload is in raw_body instead.
+        out->write(
+          |Rows (raw JSON from raw_body): { ls_resources-raw_body }| ).
+
+        "======================================================"
+        " 3) Metadata: operations_list( )
+        "    Lists the Resource Graph RP operations (read-only).
+        "======================================================"
+        out->write( |--- 3) operations_list ---| ).
+
+        DATA(ls_ops) =
+            lo_rg_client->operations_list( api_version = '2024-04-01' ).
+
+        out->write( |HTTP { ls_ops-code } / Operations: { lines( ls_ops-_200_app_json-value ) }| ).
+
+        LOOP AT ls_ops-_200_app_json-value INTO DATA(ls_op).
+          out->write( |Operation: { ls_op-name }| ).
+        ENDLOOP.
+
+      CATCH zcx_azure INTO DATA(lx_azure).
+        out->write( lx_azure->get_text( ) ).
+
+      CATCH cx_root INTO DATA(lx_other).
+        out->write( |Uncaught: { lx_other->get_text( ) }| ).
+
+
+    ENDTRY.
+
+  ENDMETHOD.
+ENDCLASS.

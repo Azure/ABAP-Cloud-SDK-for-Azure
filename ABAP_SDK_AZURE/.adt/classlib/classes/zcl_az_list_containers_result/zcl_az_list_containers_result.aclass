@@ -1,0 +1,22 @@
+CLASS zcl_az_list_containers_result DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
+
+  PUBLIC SECTION.
+   TYPES:
+      ty_t_containers TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+
+    DATA mt_containers TYPE ty_t_containers.
+    "! Continuation token for the next page (empty = last page).
+    DATA mv_next_marker TYPE string.
+
+
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+ENDCLASS.
+
+
+
+CLASS zcl_az_list_containers_result IMPLEMENTATION.
+ENDCLASS.

@@ -1,0 +1,56 @@
+CLASS zcl_az_crypto DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    "! HMAC-SHA256 of iv_data (encoded as UTF-8) keyed with a BASE64-encoded
+    "! secret, returning the signature as a base64 string. Shared by the Storage
+    "! Shared Key scheme (zcl_az_policy_shared_key) and User Delegation SAS
+    "! signing (zcl_az_blob_udk_sas) - both key the HMAC with a base64-encoded
+    "! secret (the account key / the UserDelegationKey `value`) and expect a
+    "! base64 signature.
+    CLASS-METHODS hmac_sha256_b64
+      IMPORTING
+        iv_key_base64       TYPE string
+        iv_data             TYPE string
+      RETURNING
+        VALUE(rv_signature) TYPE string
+      RAISING
+        zcx_az_serialization_error.
+
+  PRIVATE SECTION.
+
+ENDCLASS.
+
+
+
+CLASS zcl_az_crypto IMPLEMENTATION.
+
+  METHOD hmac_sha256_b64.
+
+    TRY.
+        " The key arrives base64-encoded (Azure account key / UDK value) - decode
+        " it to the raw bytes the HMAC is keyed with. The message is signed over
+        " its UTF-8 byte representation.
+        DATA(lv_key_x)  = cl_web_http_utility=>decode_x_base64( iv_key_base64 ).
+        DATA(lv_data_x) = cl_abap_conv_codepage=>create_out( codepage = 'UTF-8' )->convert( iv_data ).
+
+        cl_abap_hmac=>calculate_hmac_for_raw(
+          EXPORTING
+            if_algorithm     = 'SHA256'
+            if_key           = lv_key_x
+            if_data          = lv_data_x
+          IMPORTING
+            ef_hmacb64string = rv_signature ).
+      CATCH cx_root INTO DATA(lx).
+        RAISE EXCEPTION TYPE zcx_az_serialization_error
+          EXPORTING
+            iv_message = |HMAC-SHA256 signing failed: { lx->get_text( ) }|
+            previous   = lx.
+    ENDTRY.
+
+  ENDMETHOD.
+
+ENDCLASS.

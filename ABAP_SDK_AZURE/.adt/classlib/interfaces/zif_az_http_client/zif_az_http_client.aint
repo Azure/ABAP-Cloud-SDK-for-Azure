@@ -1,0 +1,11 @@
+INTERFACE zif_az_http_client PUBLIC.
+
+  METHODS send
+    IMPORTING
+      io_request TYPE REF TO zcl_az_http_request
+    RETURNING
+      VALUE(ro_response) TYPE REF TO zcl_az_http_response
+    RAISING
+      zcx_az_http_error.
+
+ENDINTERFACE.

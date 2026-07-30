@@ -1,0 +1,28 @@
+CLASS zcx_az_service_error DEFINITION
+  PUBLIC
+  INHERITING FROM zcx_azure
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    DATA mv_status_code TYPE i.
+    DATA mv_response_body TYPE string.
+
+    METHODS constructor
+      IMPORTING
+        !iv_message TYPE string OPTIONAL
+        !previous   LIKE previous OPTIONAL.
+
+ENDCLASS.
+
+
+
+CLASS ZCX_AZ_SERVICE_ERROR IMPLEMENTATION.
+
+  METHOD constructor ##ADT_SUPPRESS_GENERATION.
+    CALL METHOD super->constructor
+      EXPORTING
+        iv_message = iv_message
+        previous   = previous.
+  ENDMETHOD.
+ENDCLASS.

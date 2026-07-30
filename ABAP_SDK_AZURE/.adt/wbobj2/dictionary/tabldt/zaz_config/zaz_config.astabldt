@@ -1,0 +1,12 @@
+@EndUserText.label : 'Azure Credential Configuration'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #C
+@AbapCatalog.dataMaintenance : #ALLOWED
+define table zaz_config {
+
+  key client : abap.clnt not null;
+  key name   : abap.char(60) not null;
+  value      : abap.char(255);
+
+}

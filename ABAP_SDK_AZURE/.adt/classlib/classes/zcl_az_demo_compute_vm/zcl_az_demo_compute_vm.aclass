@@ -1,0 +1,207 @@
+﻿CLASS zcl_az_demo_compute_vm DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    INTERFACES if_oo_adt_classrun.
+
+  PRIVATE SECTION.
+
+    "------------------------------------------------------
+    " Demo configuration - replace with your environment
+    "------------------------------------------------------
+    CONSTANTS:
+      c_endpoint        TYPE string VALUE 'https://management.azure.com',
+      c_api_version     TYPE string VALUE '2025-11-01',
+      c_subscription_id TYPE string VALUE '<YOUR_SUBSCRIPTION_ID>',
+      c_resource_group  TYPE string VALUE '<YOUR_RESOURCE_GROUP>',
+      c_vm_name         TYPE string VALUE '<YOUR_VM_NAME>'.
+
+    "! List the virtual machines that live in the configured resource group.
+    METHODS list_resource_group_vms
+      IMPORTING
+        io_compute TYPE REF TO zif_az_compute_service
+        io_out     TYPE REF TO if_oo_adt_classrun_out
+      RAISING
+        zcx_azure.
+
+    "! Start the configured virtual machine.
+    METHODS start_virtual_machine
+      IMPORTING
+        io_compute TYPE REF TO zif_az_compute_service
+        io_out     TYPE REF TO if_oo_adt_classrun_out
+      RAISING
+        zcx_azure.
+
+    "! Stop (deallocate) the configured virtual machine. Deallocate releases
+    "! the compute resources so you stop being billed for the VM.
+    METHODS deallocate_virtual_machine
+      IMPORTING
+        io_compute TYPE REF TO zif_az_compute_service
+        io_out     TYPE REF TO if_oo_adt_classrun_out
+      RAISING
+        zcx_azure.
+
+ENDCLASS.
+
+
+
+CLASS zcl_az_demo_compute_vm IMPLEMENTATION.
+
+  METHOD if_oo_adt_classrun~main.
+
+    TRY.
+
+        "------------------------------------------------------
+        " Create Azure Credential
+        "------------------------------------------------------
+        DATA(lo_credential) =
+
+            NEW zcl_az_client_secret_cred(
+
+                iv_client_id =
+                    '<YOUR_CLIENT_ID>'
+
+                iv_client_secret =
+                    '<YOUR_CLIENT_SECRET>'
+
+                iv_tenant_id =
+                    '<YOUR_TENANT_ID>' ).
+
+        out->write(
+            'Credential created' ).
+
+        "------------------------------------------------------
+        " Create Compute Client (typed as the service interface)
+        "------------------------------------------------------
+        DATA(lo_compute) =
+
+            CAST zif_az_compute_service(
+
+                NEW zcl_az_compute_client(
+
+                    iv_endpoint   = c_endpoint
+
+                    io_credential = lo_credential ) ).
+
+        out->write(
+            'ComputeClient created' ).
+
+        "------------------------------------------------------
+        " 1) List VMs in the resource group
+        "------------------------------------------------------
+        list_resource_group_vms(
+            io_compute = lo_compute
+            io_out     = out ).
+
+        "------------------------------------------------------
+        " 2) Start a VM
+        "------------------------------------------------------
+*        start_virtual_machine(
+*            io_compute = lo_compute
+*            io_out     = out ).
+
+        "------------------------------------------------------
+        " 3) Stop (deallocate) a VM
+        "------------------------------------------------------
+        deallocate_virtual_machine(
+            io_compute = lo_compute
+            io_out     = out ).
+
+
+      CATCH zcx_azure INTO DATA(lx_azure).
+
+        out->write(
+            lx_azure->get_text( ) ).
+
+    ENDTRY.
+
+  ENDMETHOD.
+
+
+  METHOD list_resource_group_vms.
+
+    io_out->write(
+        |Listing virtual machines in resource group '{ c_resource_group }'...| ).
+
+    DATA(ls_result) =
+
+        io_compute->virtualmachines_list(
+
+            api_version         = c_api_version
+
+            subscription_id     = c_subscription_id
+
+            resource_group_name = c_resource_group ).
+
+    io_out->write(
+        |HTTP { ls_result-code } { ls_result-reason }| ).
+
+    LOOP AT ls_result-_200_app_json-value
+         INTO DATA(ls_vm).
+
+      io_out->write(
+          |VM: { ls_vm-name } | &&
+          |(location: { ls_vm-location }, | &&
+          |state: { ls_vm-properties-provisioning_state })| ).
+
+    ENDLOOP.
+
+    IF ls_result-_200_app_json-value IS INITIAL.
+
+      io_out->write(
+          'No virtual machines found in this resource group.' ).
+
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD start_virtual_machine.
+
+    io_out->write(
+        |Starting virtual machine '{ c_vm_name }'...| ).
+
+    DATA(ls_start) =
+
+        io_compute->virtualmachines_start(
+
+            vm_name             = c_vm_name
+
+            api_version         = c_api_version
+
+            subscription_id     = c_subscription_id
+
+            resource_group_name = c_resource_group ).
+
+    io_out->write(
+        |Start request accepted: HTTP { ls_start-code } { ls_start-reason }| ).
+
+  ENDMETHOD.
+
+
+  METHOD deallocate_virtual_machine.
+
+    io_out->write(
+        |Stopping (deallocating) virtual machine '{ c_vm_name }'...| ).
+
+    DATA(ls_deallocate) =
+
+        io_compute->virtualmachines_deallocate(
+
+            vm_name             = c_vm_name
+
+            api_version         = c_api_version
+
+            subscription_id     = c_subscription_id
+
+            resource_group_name = c_resource_group ).
+
+    io_out->write(
+        |Deallocate request accepted: HTTP { ls_deallocate-code } { ls_deallocate-reason }| ).
+
+  ENDMETHOD.
+
+ENDCLASS.

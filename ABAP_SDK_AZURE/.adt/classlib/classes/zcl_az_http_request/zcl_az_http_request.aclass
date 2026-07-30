@@ -1,0 +1,21 @@
+CLASS zcl_az_http_request DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
+
+  PUBLIC SECTION.
+    TYPES: ty_t_headers TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+
+  DATA mv_method TYPE string.
+    DATA mv_url TYPE string.
+    DATA mt_headers TYPE ty_t_headers.
+    DATA mv_body TYPE string.
+    DATA mv_body_bin TYPE xstring.
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+ENDCLASS.
+
+
+
+CLASS ZCL_AZ_HTTP_REQUEST IMPLEMENTATION.
+ENDCLASS.

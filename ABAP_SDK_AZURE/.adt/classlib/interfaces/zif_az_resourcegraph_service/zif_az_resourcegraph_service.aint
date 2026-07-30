@@ -1,0 +1,163 @@
+INTERFACE zif_az_resourcegraph_service PUBLIC.
+* Title: Azure Resource Graph
+* Description: Azure Resource Graph API Reference
+* Version: 2024-04-01
+
+  CONSTANTS base_path TYPE string VALUE 'https://management.azure.com'.
+
+* ResultTruncated
+  TYPES result_truncated TYPE string.
+* ResourceGraphCommon.ErrorDetails
+  TYPES: BEGIN OF resource_graph_common__err01,
+           code TYPE string,
+           message TYPE string,
+         END OF resource_graph_common__err01.
+* ResourceGraphCommon.Error
+  TYPES: BEGIN OF resource_graph_common__error,
+           code TYPE string,
+           message TYPE string,
+           details TYPE STANDARD TABLE OF resource_graph_common__err01 WITH DEFAULT KEY,
+         END OF resource_graph_common__error.
+* ResourceGraphCommon.ErrorResponse
+  TYPES: BEGIN OF resource_graph_common__err02,
+           error TYPE resource_graph_common__error,
+         END OF resource_graph_common__err02.
+* Facet
+  TYPES: BEGIN OF facet,
+           expression TYPE string,
+           result_type TYPE string,
+         END OF facet.
+* QueryResponse
+  TYPES: BEGIN OF query_response,
+           total_records TYPE i,
+           count TYPE i,
+           result_truncated TYPE result_truncated,
+           _skip_token TYPE string,
+           data TYPE string,
+           facets TYPE STANDARD TABLE OF facet WITH DEFAULT KEY,
+         END OF query_response.
+* QueryRequestOptions
+* Enum: query_request_options-result_format
+  CONSTANTS: BEGIN OF c_enum_query_request_options,
+               table TYPE string VALUE 'table',
+               objectarray TYPE string VALUE 'objectArray',
+             END OF c_enum_query_request_options.
+* Enum: query_request_options-authorization_scope_filter
+  CONSTANTS: BEGIN OF c_enum_query_request_optio01,
+               atscopeandbelow TYPE string VALUE 'AtScopeAndBelow',
+               atscopeandabove TYPE string VALUE 'AtScopeAndAbove',
+               atscopeexact TYPE string VALUE 'AtScopeExact',
+               atscopeaboveandbelow TYPE string VALUE 'AtScopeAboveAndBelow',
+             END OF c_enum_query_request_optio01.
+  TYPES: BEGIN OF query_request_options,
+           _skip_token TYPE string,
+           _top TYPE i,
+           _skip TYPE i,
+           result_format TYPE string,
+           allow_partial_scopes TYPE abap_bool,
+           authorization_scope_filter TYPE string,
+         END OF query_request_options.
+* FacetRequestOptions
+* Enum: facet_request_options-sort_order
+  CONSTANTS: BEGIN OF c_enum_facet_request_options,
+               asc TYPE string VALUE 'asc',
+               desc TYPE string VALUE 'desc',
+             END OF c_enum_facet_request_options.
+  TYPES: BEGIN OF facet_request_options,
+           sort_by TYPE string,
+           sort_order TYPE string,
+           filter TYPE string,
+           _top TYPE i,
+         END OF facet_request_options.
+* FacetRequest
+  TYPES: BEGIN OF facet_request,
+           expression TYPE string,
+           options TYPE facet_request_options,
+         END OF facet_request.
+* QueryRequest
+  TYPES: BEGIN OF query_request,
+           subscriptions TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+           management_groups TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+           query TYPE string,
+           options TYPE query_request_options,
+           facets TYPE STANDARD TABLE OF facet_request WITH DEFAULT KEY,
+         END OF query_request.
+* OperationDisplay
+  TYPES: BEGIN OF operation_display,
+           provider TYPE string,
+           resource TYPE string,
+           operation TYPE string,
+           description TYPE string,
+         END OF operation_display.
+* Operation
+  TYPES: BEGIN OF operation,
+           name TYPE string,
+           display TYPE operation_display,
+           origin TYPE string,
+         END OF operation.
+* OperationListResult
+  TYPES: BEGIN OF operation_list_result,
+           value TYPE STANDARD TABLE OF operation WITH DEFAULT KEY,
+           next_link TYPE string,
+         END OF operation_list_result.
+* FacetResult
+  TYPES: BEGIN OF facet_result,
+           expression TYPE string,
+           result_type TYPE string,
+           total_records TYPE i,
+           count TYPE i,
+           data TYPE string,
+         END OF facet_result.
+* FacetError
+  TYPES: BEGIN OF facet_error,
+           expression TYPE string,
+           result_type TYPE string,
+           errors TYPE STANDARD TABLE OF resource_graph_common__err01 WITH DEFAULT KEY,
+         END OF facet_error.
+
+  TYPES: BEGIN OF r_operations_list,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_json TYPE operation_list_result,
+           _default_app_json TYPE resource_graph_common__err02,
+         END OF r_operations_list.
+  METHODS operations_list
+    IMPORTING
+      api_version TYPE string
+    RETURNING
+      VALUE(return) TYPE r_operations_list
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_resources,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_json TYPE query_response,
+           _default_app_json TYPE resource_graph_common__err02,
+         END OF r_resources.
+  METHODS resources
+    IMPORTING
+      api_version TYPE string
+      body TYPE query_request
+    RETURNING
+      VALUE(return) TYPE r_resources
+    RAISING
+      zcx_azure.
+
+  "--- ergonomic convenience method (hand-written facade) ---
+
+  METHODS query_resources
+    IMPORTING
+      iv_query            TYPE string
+      it_subscriptions    TYPE string_table OPTIONAL
+      it_managementgroups TYPE string_table OPTIONAL
+      iv_result_format    TYPE string OPTIONAL   " 'objectArray' or 'table'
+    RETURNING
+      VALUE(ro_result) TYPE REF TO zcl_az_rg_query_result
+    RAISING
+      zcx_azure.
+
+ENDINTERFACE.

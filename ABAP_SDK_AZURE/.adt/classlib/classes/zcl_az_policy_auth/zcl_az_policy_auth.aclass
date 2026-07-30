@@ -1,0 +1,108 @@
+CLASS zcl_az_policy_auth DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    INTERFACES zif_az_http_pipeline_policy.
+
+    METHODS constructor
+      IMPORTING
+        io_credential TYPE REF TO zif_az_token_credential
+        iv_scope TYPE string.
+
+  PRIVATE SECTION.
+
+    DATA mo_credential TYPE REF TO zif_az_token_credential.
+    DATA mv_scope TYPE string.
+
+ENDCLASS.
+
+
+
+CLASS ZCL_AZ_POLICY_AUTH IMPLEMENTATION.
+
+
+METHOD constructor.
+
+  mo_credential = io_credential.
+  mv_scope = iv_scope.
+
+ENDMETHOD.
+
+
+METHOD zif_az_http_pipeline_policy~process.
+
+  DATA lv_token TYPE string.
+
+  " Guard: required inputs must be bound
+  IF io_context IS INITIAL OR io_request IS INITIAL.
+    RAISE EXCEPTION TYPE zcx_az_http_error
+      EXPORTING
+        iv_status_code = 0
+        iv_message     = |Invalid request: context or request is not bound.|.
+  ENDIF.
+
+  " Guard: credential provider must be available
+  IF mo_credential IS INITIAL.
+    RAISE EXCEPTION TYPE zcx_az_http_error
+      EXPORTING
+        iv_status_code = 0
+        iv_message     = |Authentication failed: credential is not bound.|.
+  ENDIF.
+
+  " Defensive: token retrieval may dereference an initial internal handle
+  TRY.
+      DATA(lo_token) =
+          mo_credential->get_token(
+              iv_scope = mv_scope ).
+
+      IF lo_token IS NOT BOUND.
+        RAISE EXCEPTION TYPE zcx_az_http_error
+          EXPORTING
+            iv_status_code = 0
+            iv_message     = |Authentication failed: no token returned for scope { mv_scope }.|.
+      ENDIF.
+
+      lv_token = lo_token->get_token( ).
+
+    CATCH zcx_az_http_error INTO DATA(lx_token_http_error).
+    RAISE EXCEPTION TYPE zcx_az_http_error
+        EXPORTING
+          iv_status_code = 0
+          iv_message     = |{ lx_token_http_error->get_text( ) } Scope: { mv_scope }.|
+          previous       = lx_token_http_error.
+
+    CATCH cx_root INTO DATA(lx_token_error).
+      RAISE EXCEPTION TYPE zcx_az_http_error
+        EXPORTING
+          iv_status_code = 0
+          iv_message     = |Failed to acquire bearer token for scope { mv_scope }.|
+          previous       = lx_token_error.
+  ENDTRY.
+
+  APPEND
+    |Authorization: Bearer { lv_token }|
+    TO io_request->mt_headers.
+
+  " Defensive: a failure in the downstream pipeline must surface cleanly
+  TRY.
+      ro_response =
+          io_context->next( io_request ).
+
+    CATCH zcx_az_http_error INTO DATA(lx_http_err).
+      " propagate the original typed transport/service error unchanged
+      RAISE EXCEPTION lx_http_err.
+
+    CATCH cx_root INTO DATA(lx_next_error).
+      RAISE EXCEPTION TYPE zcx_az_http_error
+        EXPORTING
+          iv_status_code = 0
+          iv_message     = |HTTP request failed in authentication policy.|
+          previous       = lx_next_error.
+  ENDTRY.
+
+ENDMETHOD.
+
+ENDCLASS.

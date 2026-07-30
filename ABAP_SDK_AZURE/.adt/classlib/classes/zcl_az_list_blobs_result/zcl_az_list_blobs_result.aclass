@@ -1,0 +1,34 @@
+CLASS zcl_az_list_blobs_result DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    "! One entry of a blob listing.
+    TYPES: BEGIN OF ty_blob,
+             name           TYPE string,
+             content_length TYPE i,
+             content_type   TYPE string,
+             etag           TYPE string,
+             last_modified  TYPE string,
+             blob_type      TYPE string,
+           END OF ty_blob.
+    TYPES ty_t_blobs TYPE STANDARD TABLE OF ty_blob WITH DEFAULT KEY.
+
+    "! Blob names returned when a delimiter rolls up virtual directories.
+    TYPES ty_t_prefixes TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+
+    DATA mt_blobs       TYPE ty_t_blobs.
+    DATA mt_prefixes    TYPE ty_t_prefixes.
+    "! Continuation token for the next page (empty = last page).
+    DATA mv_next_marker TYPE string.
+
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+ENDCLASS.
+
+
+
+CLASS zcl_az_list_blobs_result IMPLEMENTATION.
+ENDCLASS.

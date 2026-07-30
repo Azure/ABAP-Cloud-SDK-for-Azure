@@ -1,0 +1,342 @@
+﻿CLASS zcl_az_demo_blob_ops DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    INTERFACES if_oo_adt_classrun.
+
+  PRIVATE SECTION.
+
+    "------------------------------------------------------
+    " Demo configuration - replace with your environment
+    "------------------------------------------------------
+    CONSTANTS:
+      c_account_name TYPE string VALUE '<YOUR_STORAGE_ACCOUNT>',
+      c_container    TYPE string VALUE '<YOUR_CONTAINER>',
+      c_blob_name    TYPE string VALUE 'invoice.pdf'.
+
+    "! List the containers in the storage account.
+    METHODS list_containers
+      IMPORTING
+        io_blob TYPE REF TO zif_az_blob_service
+        io_out  TYPE REF TO if_oo_adt_classrun_out
+      RAISING
+        zcx_azure.
+
+    "! List the blobs inside the configured container.
+    METHODS list_blobs
+      IMPORTING
+        io_blob TYPE REF TO zif_az_blob_service
+        io_out  TYPE REF TO if_oo_adt_classrun_out
+      RAISING
+        zcx_azure.
+
+    "! Upload a small text blob (create/overwrite).
+    METHODS upload_blob
+      IMPORTING
+        io_blob TYPE REF TO zif_az_blob_service
+        io_out  TYPE REF TO if_oo_adt_classrun_out
+      RAISING
+        zcx_azure.
+
+    "! Download the blob just uploaded and print its content.
+    METHODS download_blob
+      IMPORTING
+        io_blob TYPE REF TO zif_az_blob_service
+        io_out  TYPE REF TO if_oo_adt_classrun_out
+      RAISING
+        zcx_azure.
+
+ENDCLASS.
+
+
+
+CLASS zcl_az_demo_blob_ops IMPLEMENTATION.
+
+  METHOD if_oo_adt_classrun~main.
+
+    TRY.
+
+        "------------------------------------------------------
+        " Create Blob Client (typed as the service interface).
+        " Auth modes, listed from MOST to LEAST recommended:
+        "   1. User Delegation SAS -> Entra ID-signed, identity-traceable SAS, no key (RECOMMENDED)
+        "   2. Managed Identity    -> IMDS bearer token, needs a Storage Blob Data role
+        "   3. Entra ID credential -> client secret, needs a Storage Blob Data role
+        "   4. SAS token           -> pre-issued signed URL (use only when necessary)
+        "   5. Shared Key          -> account-key HMAC signature (least recommended)
+        " This demo defaults to the recommended User Delegation SAS (lv_use_udk).
+        "------------------------------------------------------
+        DATA lo_blob TYPE REF TO zif_az_blob_service.
+
+        " Optional, least-recommended inputs - leave blank to use an Entra ID-based
+        " mode below. If set, the constructor honours a pre-built SAS / account key
+        " first (resolution order: iv_sas_token -> iv_account_key -> io_credential).
+        DATA lv_sas_token   TYPE string VALUE ''.
+        DATA lv_account_key TYPE string VALUE ''.
+        " Recommended Entra ID-based modes (no token/key to paste):
+        "   * User Delegation SAS: an Entra ID credential mints a delegation key, which
+        "     signs a short-lived, identity-traceable SAS (no account key).
+        "   * Managed Identity: the host's IMDS issues the bearer token directly.
+        DATA lv_use_udk TYPE abap_bool VALUE abap_true.
+
+        DATA lv_use_mi  TYPE abap_bool VALUE abap_false.
+
+        IF lv_sas_token IS NOT INITIAL.
+
+            lo_blob =
+                NEW zcl_az_blob_client(
+                    iv_account_name = c_account_name
+                    iv_sas_token    = lv_sas_token ).
+
+            out->write(
+                'BlobClient created (SAS auth)' ).
+
+        ELSEIF lv_account_key IS NOT INITIAL.
+
+            lo_blob =
+                NEW zcl_az_blob_client(
+                    iv_account_name = c_account_name
+                    iv_account_key  = lv_account_key ).
+
+            out->write(
+                'BlobClient created (Shared Key auth)' ).
+
+        ELSEIF lv_use_udk = abap_true.
+
+            "------------------------------------------------------
+            " User Delegation SAS: bootstrap with an Entra ID credential, mint a
+            " delegation key, and get a blob client authenticated with a SAS
+            " signed by that key. No account key; the SAS is traceable to the
+            " Entra ID identity (skoid/sktid) and short-lived.
+            "------------------------------------------------------
+            DATA(lo_udk_credential) =
+                NEW zcl_az_client_secret_cred(
+                    iv_client_id     = '<YOUR_CLIENT_ID>'
+                    iv_client_secret = '<YOUR_CLIENT_SECRET>'
+                    iv_tenant_id     = '<YOUR_TENANT_ID>' ).
+
+            DATA(lo_udk) =
+                NEW zcl_az_blob_udk_sas(
+                    iv_account_name = c_account_name
+                    io_credential   = lo_udk_credential ).
+
+            " a 1-hour window in UTC (ISO 8601) for the key and the SAS
+            GET TIME STAMP FIELD DATA(lv_now).
+            DATA lv_d TYPE d.
+            DATA lv_t TYPE t.
+            CONVERT TIME STAMP lv_now TIME ZONE 'UTC' INTO DATE lv_d TIME lv_t.
+            DATA(lv_udk_start)  = |{ lv_d(4) }-{ lv_d+4(2) }-{ lv_d+6(2) }T{ lv_t(2) }:{ lv_t+2(2) }:{ lv_t+4(2) }Z|.
+            DATA(lv_exp_date)   = CONV d( lv_d + 1 ).
+            DATA(lv_udk_expiry) = |{ lv_exp_date(4) }-{ lv_exp_date+4(2) }-{ lv_exp_date+6(2) }T{ lv_t(2) }:{ lv_t+2(2) }:{ lv_t+4(2) }Z|.
+
+            lo_blob =
+                lo_udk->create_blob_client(
+                    iv_container   = c_container
+                    iv_permissions = 'racwdl'      " read/add/create/write/delete/list (container-scoped)
+                    iv_start       = lv_udk_start
+                    iv_expiry      = lv_udk_expiry ).
+
+            out->write(
+                'BlobClient created (User Delegation SAS)' ).
+
+        ELSEIF lv_use_mi = abap_true.
+
+            "------------------------------------------------------
+            " Managed Identity: the host's IMDS endpoint issues the bearer token.
+            " The identity must hold a Storage Blob Data role on the account.
+            "------------------------------------------------------
+            lo_blob =
+                NEW zcl_az_blob_client(
+                    iv_account_name = c_account_name
+                    io_credential   = NEW zcl_az_managed_identity_cred( ) ).
+
+            out->write(
+                'BlobClient created (Managed Identity auth)' ).
+
+        ELSE.
+
+        "------------------------------------------------------
+        " Create Azure Credential
+        "------------------------------------------------------
+        DATA(lo_credential) =
+
+            NEW zcl_az_client_secret_cred(
+            iv_client_id =
+                    '<YOUR_CLIENT_ID>'
+
+                iv_client_secret =
+                    '<YOUR_CLIENT_SECRET>'
+
+                iv_tenant_id =
+                    '<YOUR_TENANT_ID>'
+ ).
+
+        out->write(
+            'Credential created' ).
+
+            lo_blob =
+                NEW zcl_az_blob_client(
+                    iv_account_name = c_account_name
+                    io_credential   = lo_credential ).
+
+            out->write(
+                'BlobClient created (Entra ID auth)' ).
+
+        ENDIF.
+
+        "------------------------------------------------------
+        " 1) List containers (account-level: only when NOT using a
+        "    container/service-scoped SAS - a container SAS cannot list
+        "    containers and Azure returns "signed resource not allowed for
+        "    this resource level"). An account SAS carries 'srt=' and can.
+        " 2) List blobs in a container
+        " 3) Upload a blob
+        " 4) Download the blob back
+        "------------------------------------------------------
+        DATA(lv_can_list_containers) = abap_true.
+        IF lv_sas_token IS NOT INITIAL.
+          " account SAS -> 'srt='; service/container SAS -> 'sr=' (no listing of containers)
+          lv_can_list_containers = boolc( lv_sas_token CS 'srt=' ).
+        ELSEIF lv_use_udk = abap_true.
+          " the UDK SAS above is container-scoped (sr='c') -> cannot list containers
+          lv_can_list_containers = abap_false.
+        ENDIF.
+
+        IF lv_can_list_containers = abap_true.
+          list_containers(
+              io_blob = lo_blob
+              io_out  = out ).
+        ELSE.
+          out->write(
+              'Skipping list_containers: SAS is container/service-scoped (no account-level listing).' ).
+        ENDIF.
+
+        list_blobs(
+            io_blob = lo_blob
+            io_out  = out ).
+
+        upload_blob(
+            io_blob = lo_blob
+            io_out  = out ).
+
+        download_blob(
+            io_blob = lo_blob
+            io_out  = out ).
+
+
+      CATCH zcx_azure INTO DATA(lx_azure).
+
+        out->write(
+            lx_azure->get_text( ) ).
+
+    ENDTRY.
+
+  ENDMETHOD.
+
+
+  METHOD list_containers.
+
+    io_out->write(
+        'Listing containers...' ).
+
+    DATA(lo_result) = io_blob->list_containers( ).
+
+    LOOP AT lo_result->mt_containers INTO DATA(lv_container).
+      io_out->write( |Container: { lv_container }| ).
+    ENDLOOP.
+
+    IF lo_result->mt_containers IS INITIAL.
+      io_out->write( 'No containers found.' ).
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD list_blobs.
+
+    io_out->write(
+        |Listing blobs in container '{ c_container }'...| ).
+
+    DATA(lo_result) =
+        io_blob->list_blobs( iv_container = c_container ).
+
+    LOOP AT lo_result->mt_blobs INTO DATA(ls_blob).
+      io_out->write(
+          |Blob: { ls_blob-name } | &&
+          |({ ls_blob-content_length } bytes, | &&
+          |{ ls_blob-content_type })| ).
+    ENDLOOP.
+
+    IF lo_result->mt_blobs IS INITIAL.
+      io_out->write( 'No blobs found in this container.' ).
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD upload_blob.
+
+    io_out->write(
+        |Uploading document '{ c_blob_name }'...| ).
+
+    " Build a small, self-contained document to upload. Here we assemble a
+    " minimal valid PDF (an "invoice") entirely in memory so the demo has no
+    " external dependencies.
+    "
+    " In a real scenario you would obtain the document bytes (an xstring) from
+    " your own source instead - for example a PDF rendered with the SAP Forms
+    " service / cl_fp*, a spool request, an ArchiveLink document, or an
+    " application server file - and pass those bytes as iv_content below.
+    DATA(lv_pdf_text) =
+      |%PDF-1.4\n| &&
+      |1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n| &&
+      |2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n| &&
+      |3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 144]| &&
+      |/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n| &&
+      |4 0 obj<</Length 64>>stream\n| &&
+      |BT /F1 18 Tf 20 100 Td (Invoice - ABAP SDK for Azure) Tj ET\n| &&
+      |endstream endobj\n| &&
+      |5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n| &&
+      |trailer<</Root 1 0 R>>\n%%EOF|.
+
+    DATA(lv_content) =
+        cl_abap_conv_codepage=>create_out( codepage = 'UTF-8'
+          )->convert( lv_pdf_text ).
+
+    DATA(lo_result) =
+        io_blob->upload_blob(
+            iv_container    = c_container
+            iv_blob_name    = c_blob_name
+            iv_content      = lv_content
+            iv_content_type = 'application/pdf' ).
+
+    io_out->write(
+        |Uploaded { xstrlen( lv_content ) } bytes. ETag: { lo_result->mv_etag }| ).
+
+  ENDMETHOD.
+
+
+  METHOD download_blob.
+
+    io_out->write(
+        |Downloading document '{ c_blob_name }'...| ).
+
+    DATA(lo_content) =
+        io_blob->download_blob(
+            iv_container = c_container
+            iv_blob_name = c_blob_name ).
+
+    io_out->write(
+        |Downloaded: Content-Type { lo_content->mv_content_type }, | &&
+        |{ lo_content->mv_content_length } bytes (ETag { lo_content->mv_etag }).| ).
+
+    " lo_content->mv_content is the raw xstring - hand it to your document
+    " store, the SAP Forms service, or offer it as a file download. (We do not
+    " print binary bytes to the console here.)
+
+  ENDMETHOD.
+
+ENDCLASS.

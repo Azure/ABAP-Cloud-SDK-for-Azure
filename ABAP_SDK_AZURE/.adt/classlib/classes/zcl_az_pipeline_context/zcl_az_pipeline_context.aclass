@@ -1,0 +1,64 @@
+CLASS zcl_az_pipeline_context DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+  TYPES it_policies TYPE STANDARD TABLE OF REF TO zif_az_http_pipeline_policy WITH EMPTY KEY.
+
+    METHODS constructor
+      IMPORTING
+        tt_policies TYPE it_policies
+        iv_index    TYPE i DEFAULT 1.
+
+
+    METHODS next
+      IMPORTING
+        io_request TYPE REF TO zcl_az_http_request
+      RETURNING
+        VALUE(ro_response) TYPE REF TO zcl_az_http_response
+      RAISING
+      zcx_az_http_error.
+
+  PRIVATE SECTION.
+
+    DATA mt_policies TYPE it_policies.
+    DATA mv_index TYPE i VALUE 1.
+
+
+ENDCLASS.
+
+
+
+CLASS ZCL_AZ_PIPELINE_CONTEXT IMPLEMENTATION.
+
+
+METHOD constructor.
+  mt_policies = tt_policies.
+  mv_index    = iv_index.
+ENDMETHOD.
+
+
+METHOD next.
+
+  READ TABLE mt_policies INDEX mv_index INTO DATA(lo_policy).
+
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+  " Hand the downstream policy an immutable context positioned at the NEXT
+  " policy.
+  DATA(lo_next_context) =
+    NEW zcl_az_pipeline_context(
+      tt_policies = mt_policies
+      iv_index    = mv_index + 1 ).
+
+  ro_response =
+    lo_policy->process(
+       io_request = io_request
+       io_context = lo_next_context ).
+
+ENDMETHOD.
+ENDCLASS.
