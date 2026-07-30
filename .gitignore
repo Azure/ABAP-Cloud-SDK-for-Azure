@@ -427,3 +427,36 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# ---------------------------------------------------------------------------
+# ABAP Cloud SDK for Azure - ADT / abapGit / secrets (appended to the VS base)
+# ---------------------------------------------------------------------------
+
+# ABAP Development Tools (ADT) / Eclipse workspace
+.metadata/
+.recommenders/
+*.launch
+.settings/
+.project.bak
+
+# abapGit
+.abapgit.log
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+.idea/
+
+# Local environment / secrets (never commit real credentials)
+*.local
+.env.*
+secrets.*
+*.secret
+
+# The exported ABAP ADT object tree must be committed in full. Override any
+# VS-template rule (e.g. **/[Pp]ackages/*, [Bb]in/, [Oo]bj/, *.log) that would
+# otherwise drop parts of it (notably .adt/wbobj/packages/).
+!ABAP_SDK_AZURE/**

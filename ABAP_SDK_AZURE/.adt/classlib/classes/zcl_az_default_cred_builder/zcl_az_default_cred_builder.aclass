@@ -1,0 +1,132 @@
+CLASS zcl_az_default_cred_builder DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    METHODS constructor.
+
+    METHODS exclude_environment_credential
+      RETURNING VALUE(ro_builder)
+      TYPE REF TO zcl_az_default_cred_builder.
+
+    METHODS exclude_managed_identity_cred
+      RETURNING VALUE(ro_builder)
+      TYPE REF TO zcl_az_default_cred_builder.
+
+    METHODS managed_identity_client_id
+      IMPORTING iv_client_id TYPE string
+      RETURNING VALUE(ro_builder)
+      TYPE REF TO zcl_az_default_cred_builder.
+
+    METHODS tenant_id
+      IMPORTING iv_tenant TYPE string
+      RETURNING VALUE(ro_builder)
+      TYPE REF TO zcl_az_default_cred_builder.
+
+    METHODS build
+      RETURNING VALUE(ro_credential)
+      TYPE REF TO zif_az_token_credential
+      RAISING zcx_az_auth_error.
+
+
+  PRIVATE SECTION.
+
+    DATA mv_use_env TYPE abap_bool VALUE abap_true.
+    DATA mv_use_mi TYPE abap_bool VALUE abap_true.
+
+    DATA mv_managed_identity_client_id TYPE string.
+    DATA mv_tenant_id TYPE string.
+
+ENDCLASS.
+
+
+
+CLASS ZCL_AZ_DEFAULT_CRED_BUILDER IMPLEMENTATION.
+
+
+METHOD constructor.
+ENDMETHOD.
+
+
+METHOD exclude_environment_credential.
+
+  mv_use_env = abap_false.
+  ro_builder = me.
+
+ENDMETHOD.
+
+
+METHOD exclude_managed_identity_cred.
+
+  mv_use_mi = abap_false.
+  ro_builder = me.
+
+ENDMETHOD.
+
+
+METHOD managed_identity_client_id.
+
+  mv_managed_identity_client_id = iv_client_id.
+  ro_builder = me.
+
+ENDMETHOD.
+
+
+METHOD tenant_id.
+
+  mv_tenant_id = iv_tenant.
+  ro_builder = me.
+
+ENDMETHOD.
+
+
+METHOD build.
+
+  " Guard: at least one provider must remain enabled
+  IF mv_use_env = abap_false AND mv_use_mi = abap_false.
+    RAISE EXCEPTION TYPE zcx_az_auth_error
+      EXPORTING
+        iv_message = |Cannot build credential: all providers are excluded.|.
+  ENDIF.
+
+  TRY.
+      DATA(lo_default) = NEW zcl_az_default_credential( ).
+
+      IF mv_use_env = abap_true.
+        lo_default->add_credential(
+          NEW zcl_az_environment_credential( ) ).
+      ENDIF.
+
+      IF mv_use_mi = abap_true.
+        DATA(lo_mi) = NEW zcl_az_managed_identity_cred( ).
+        IF mv_managed_identity_client_id IS NOT INITIAL.
+          lo_mi->set_client_id( mv_managed_identity_client_id ).
+        ENDIF.
+        lo_default->add_credential( lo_mi ).
+      ENDIF.
+
+      ro_credential = lo_default.
+
+    CATCH zcx_az_auth_error INTO DATA(lx_auth).
+      RAISE EXCEPTION lx_auth.
+
+    CATCH cx_root INTO DATA(lx_root).
+      RAISE EXCEPTION TYPE zcx_az_auth_error
+        EXPORTING
+          iv_message = |Failed to build default credential chain. { lx_root->get_text( ) }|
+          previous   = lx_root.
+  ENDTRY.
+
+  " Defensive: a credential must have been produced
+  IF ro_credential IS NOT BOUND.
+    RAISE EXCEPTION TYPE zcx_az_auth_error
+      EXPORTING
+        iv_message = |Credential builder produced no credential.|.
+  ENDIF.
+
+ENDMETHOD.
+
+
+ENDCLASS.

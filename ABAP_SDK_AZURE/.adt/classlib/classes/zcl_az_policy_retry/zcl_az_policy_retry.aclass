@@ -1,0 +1,98 @@
+CLASS zcl_az_policy_retry DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    INTERFACES zif_az_http_pipeline_policy.
+
+    METHODS constructor
+      IMPORTING
+        iv_max_retries TYPE i DEFAULT 3.
+
+  PRIVATE SECTION.
+
+    DATA mv_max_retries TYPE i.
+
+ENDCLASS.
+
+
+
+CLASS ZCL_AZ_POLICY_RETRY IMPLEMENTATION.
+
+
+METHOD constructor.
+
+  mv_max_retries = iv_max_retries.
+
+ENDMETHOD.
+
+
+METHOD zif_az_http_pipeline_policy~process.
+
+  DATA lv_retry  TYPE i VALUE 0.
+  DATA lv_status TYPE i VALUE 0.
+  DATA lv_body   TYPE string.
+
+  IF mv_max_retries < 1.
+    mv_max_retries = 1.
+  ENDIF.
+
+  IF io_context IS INITIAL OR io_request IS INITIAL.
+    RAISE EXCEPTION TYPE zcx_az_http_error
+      EXPORTING
+        iv_status_code = 0
+        iv_message     = |Invalid request: context or request is not bound.|.
+  ENDIF.
+
+  WHILE lv_retry < mv_max_retries.
+
+    TRY.
+        ro_response = io_context->next( io_request ).
+
+        IF ro_response IS BOUND AND ro_response->is_success( ) = abap_true.
+          RETURN.
+        ENDIF.
+
+      CATCH cx_root INTO DATA(lx_error).
+        IF lv_retry = mv_max_retries - 1.
+          RAISE EXCEPTION TYPE zcx_az_http_error
+            EXPORTING
+              iv_status_code = 0
+              iv_message     = |Request failed after { mv_max_retries } attempt(s). { lx_error->get_text( ) }|
+              previous       = lx_error.
+        ENDIF.
+    ENDTRY.
+
+    lv_retry = lv_retry + 1.
+
+  ENDWHILE.
+
+  IF ro_response IS NOT BOUND.
+    RAISE EXCEPTION TYPE zcx_az_http_error
+      EXPORTING
+        iv_status_code = 0
+        iv_message     = |No response received after { mv_max_retries } retries. Please ensure your request is correct. Please check your network connection or server status.|.
+  ENDIF.
+
+  " Defensive: accessor methods may dereference an initial internal handle
+  TRY.
+      lv_status = ro_response->get_status_code( ).
+      lv_body   = ro_response->get_body( ).
+    CATCH cx_root.
+      lv_status = 0.
+      lv_body   = |Response could not be read.|.
+  ENDTRY.
+
+  RAISE EXCEPTION TYPE zcx_az_http_error
+    EXPORTING
+      iv_status_code   = lv_status
+      iv_response_body = lv_body
+      iv_message       = |Request failed after { mv_max_retries } retries. HTTP { lv_status }: { lv_body }|.
+
+ENDMETHOD.
+
+
+
+ENDCLASS.

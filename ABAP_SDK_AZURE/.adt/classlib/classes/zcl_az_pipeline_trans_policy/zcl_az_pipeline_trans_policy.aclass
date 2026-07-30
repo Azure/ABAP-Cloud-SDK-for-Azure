@@ -1,0 +1,81 @@
+CLASS zcl_az_pipeline_trans_policy DEFINITION
+PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    INTERFACES zif_az_http_pipeline_policy.
+
+    METHODS constructor
+      IMPORTING
+        io_http_client TYPE REF TO zif_az_http_client.
+
+  PRIVATE SECTION.
+
+    DATA mo_http_client TYPE REF TO zif_az_http_client.
+
+ENDCLASS.
+
+
+
+CLASS ZCL_AZ_PIPELINE_TRANS_POLICY IMPLEMENTATION.
+
+
+METHOD constructor.
+
+  mo_http_client = io_http_client.
+
+ENDMETHOD.
+
+
+METHOD zif_az_http_pipeline_policy~process.
+
+  " Guard: request must be bound
+  IF io_request IS INITIAL.
+    RAISE EXCEPTION TYPE zcx_az_http_error
+      EXPORTING
+        iv_status_code = 0
+        iv_message     = |Invalid request: request is not bound.|.
+  ENDIF.
+
+  " Guard: transport client must be available
+  IF mo_http_client IS INITIAL.
+    RAISE EXCEPTION TYPE zcx_az_http_error
+      EXPORTING
+        iv_status_code = 0
+        iv_message     = |Transport failed: HTTP client is not bound.|.
+  ENDIF.
+
+  " Defensive: the client call may dereference an initial internal handle
+  TRY.
+      ro_response =
+          mo_http_client->send(
+              io_request ).
+
+    CATCH cx_web_http_client_error INTO DATA(lx_http_error).
+      RAISE EXCEPTION TYPE zcx_az_http_error
+        EXPORTING
+          iv_status_code = 0
+          iv_message     = lx_http_error->get_text( )
+          previous       = lx_http_error.
+
+    CATCH cx_root INTO DATA(lx_error).
+      RAISE EXCEPTION TYPE zcx_az_http_error
+        EXPORTING
+          iv_status_code = 0
+          iv_message     = |Unexpected error during HTTP transport.|
+          previous       = lx_error.
+  ENDTRY.
+
+  " Defensive: a successful send must still yield a bound response
+  IF ro_response IS NOT BOUND.
+    RAISE EXCEPTION TYPE zcx_az_http_error
+      EXPORTING
+        iv_status_code = 0
+        iv_message     = |Transport returned no response.|.
+  ENDIF.
+
+ENDMETHOD.
+
+ENDCLASS.

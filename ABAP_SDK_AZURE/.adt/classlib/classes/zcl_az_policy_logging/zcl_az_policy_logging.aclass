@@ -1,0 +1,72 @@
+CLASS zcl_az_policy_logging DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+    INTERFACES zif_az_http_pipeline_policy.
+ENDCLASS.
+
+
+
+CLASS ZCL_AZ_POLICY_LOGGING IMPLEMENTATION.
+
+
+METHOD zif_az_http_pipeline_policy~process.
+
+  DATA lv_start    TYPE timestampl.
+  DATA lv_end      TYPE timestampl.
+  DATA lv_duration TYPE p LENGTH 16 DECIMALS 3.
+  DATA lv_status   TYPE i VALUE 0.
+  DATA lv_method   TYPE string.
+  DATA lv_url      TYPE string.
+
+  " Guard: required inputs must be bound
+  IF io_context IS INITIAL OR io_request IS INITIAL.
+    RAISE EXCEPTION TYPE zcx_az_http_error
+      EXPORTING
+        iv_status_code = 0
+        iv_message     = |Invalid request: context or request is not bound.|.
+  ENDIF.
+
+  GET TIME STAMP FIELD lv_start.
+
+  TRY.
+      ro_response = io_context->next( io_request ).
+
+    CATCH cx_root INTO DATA(lx_error).
+            GET TIME STAMP FIELD lv_end.
+      lv_duration = cl_abap_tstmp=>subtract( tstmp1 = lv_end
+                                             tstmp2 = lv_start ).
+
+      " TODO: log the failed attempt with lv_duration via zif_az_logger
+      RAISE EXCEPTION TYPE zcx_az_http_error
+        EXPORTING
+          iv_status_code = 0
+          iv_message     = |HTTP request failed after { lv_duration } seconds.|
+          previous       = lx_error.
+  ENDTRY.
+
+   GET TIME STAMP FIELD lv_end.
+  lv_duration = cl_abap_tstmp=>subtract( tstmp1 = lv_end
+                                         tstmp2 = lv_start ).
+
+
+  " Defensive: response or its internal members may be unbound
+  TRY.
+      lv_method = io_request->mv_method.
+      lv_url    = io_request->mv_url.
+
+      IF ro_response IS BOUND.
+        lv_status = ro_response->mv_status_code.
+      ENDIF.
+    CATCH cx_root.
+      lv_status = 0.
+  ENDTRY.
+
+  " TODO: Inject a logger interface (e.g. zif_az_logger) to handle log output
+  " |HTTP { lv_method } { lv_url } Status: { lv_status } Duration: { lv_duration }|
+
+ENDMETHOD.
+
+ENDCLASS.

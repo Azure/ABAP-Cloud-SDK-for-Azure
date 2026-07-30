@@ -1,0 +1,37 @@
+CLASS zcl_az_access_token DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+
+  PUBLIC SECTION.
+
+    METHODS constructor
+      IMPORTING
+        iv_token      TYPE string
+        iv_expires_in TYPE i.
+
+    METHODS get_token
+      RETURNING VALUE(rv_token) TYPE string.
+
+  PRIVATE SECTION.
+
+    DATA mv_token TYPE string.
+    DATA mv_expires_in TYPE i.
+ENDCLASS.
+
+
+
+CLASS ZCL_AZ_ACCESS_TOKEN IMPLEMENTATION.
+
+
+  METHOD constructor.
+    mv_token = iv_token.
+    mv_expires_in = iv_expires_in.
+  ENDMETHOD.
+
+
+  METHOD get_token.
+    rv_token = mv_token.
+  ENDMETHOD.
+ENDCLASS.

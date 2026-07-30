@@ -1,0 +1,151 @@
+CLASS zcl_az_http_response DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    TYPES:
+      ty_t_headers TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+
+    METHODS constructor
+      IMPORTING
+        iv_status_code TYPE i
+        iv_body        TYPE string OPTIONAL
+        iv_body_bin    TYPE xstring OPTIONAL
+        it_headers     TYPE ty_t_headers OPTIONAL.
+
+    DATA mv_status_code TYPE i READ-ONLY.
+    DATA mv_body        TYPE string READ-ONLY.
+    DATA mv_body_bin    TYPE xstring READ-ONLY.
+    DATA mt_headers TYPE ty_t_headers.
+
+    METHODS get_status_code
+      RETURNING VALUE(rv_status_code) TYPE i.
+
+    METHODS get_body
+      RETURNING VALUE(rv_body) TYPE string.
+
+    METHODS get_body_bin
+      RETURNING VALUE(rv_body) TYPE xstring.
+
+    METHODS get_headers
+      RETURNING VALUE(rt_headers) TYPE ty_t_headers.
+
+    METHODS is_success
+      RETURNING VALUE(rv_success) TYPE abap_bool.
+
+    "! True when the content type denotes a textual payload (json/xml/text or
+    "! empty); false for binary payloads (octet-stream, image/*, zip, ...).
+    CLASS-METHODS is_textual_content_type
+      IMPORTING
+        iv_content_type   TYPE string
+      RETURNING
+        VALUE(rv_textual) TYPE abap_bool.
+
+    METHODS get_header
+      IMPORTING
+        iv_name TYPE string
+      RETURNING
+        VALUE(rv_value) TYPE string.
+
+  PRIVATE SECTION.
+
+
+ENDCLASS.
+
+
+
+CLASS zcl_az_http_response IMPLEMENTATION.
+
+  METHOD constructor.
+
+    mv_status_code = iv_status_code.
+    mv_body        = iv_body.
+    mv_body_bin    = iv_body_bin.
+    mt_headers     = it_headers.
+
+  ENDMETHOD.
+
+
+  METHOD get_status_code.
+
+    rv_status_code = mv_status_code.
+
+  ENDMETHOD.
+
+
+  METHOD get_body.
+
+    rv_body = mv_body.
+
+  ENDMETHOD.
+
+
+  METHOD get_body_bin.
+
+    rv_body = mv_body_bin.
+
+  ENDMETHOD.
+
+
+  METHOD is_textual_content_type.
+
+    DATA(lv_ct) = to_lower( iv_content_type ).
+
+    IF lv_ct IS INITIAL
+       OR lv_ct CS 'json'
+       OR lv_ct CS 'xml'
+       OR lv_ct CS 'text'.
+      rv_textual = abap_true.
+    ELSE.
+      rv_textual = abap_false.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD get_headers.
+
+    rt_headers = mt_headers.
+
+  ENDMETHOD.
+
+
+  METHOD is_success.
+
+    IF mv_status_code >= 200
+       AND mv_status_code < 300.
+
+      rv_success = abap_true.
+
+    ELSE.
+
+      rv_success = abap_false.
+
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD get_header.
+
+    LOOP AT mt_headers INTO DATA(lv_header).
+
+      SPLIT lv_header AT ':' INTO DATA(lv_name) DATA(lv_value).
+
+      CONDENSE lv_name.
+      CONDENSE lv_value.
+
+      IF to_upper( lv_name ) = to_upper( iv_name ).
+
+        rv_value = lv_value.
+        RETURN.
+
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+ENDCLASS.

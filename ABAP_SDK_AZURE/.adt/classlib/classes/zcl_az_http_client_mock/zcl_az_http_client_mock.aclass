@@ -1,0 +1,112 @@
+CLASS zcl_az_http_client_mock DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    "! Test double for the SDK transport. Implements zif_az_http_client so it can
+    "! be injected into any service client via the io_http_client constructor seam.
+    "! Acts as a STUB (returns scripted responses) and a SPY (captures every request
+    "! so tests can assert the request transformation: verb, URL, headers, body).
+    INTERFACES zif_az_http_client.
+
+    "! Queue a scripted response. Call once per expected transport hit; for retry
+    "! scenarios queue several (returned in order; the last one repeats).
+    METHODS add_response
+      IMPORTING
+        iv_status       TYPE i
+        iv_body         TYPE string OPTIONAL
+        iv_body_bin     TYPE xstring OPTIONAL
+        it_headers      TYPE zcl_az_http_response=>ty_t_headers OPTIONAL
+        iv_content_type TYPE string DEFAULT 'application/json'.
+
+
+    "! Force the next send( ) to raise (e.g. simulate a transport failure).
+    METHODS set_error
+      IMPORTING
+        io_error TYPE REF TO zcx_az_http_error.
+
+    "! The most recent request the client built (spy).
+    METHODS get_last_request
+      RETURNING VALUE(ro_request) TYPE REF TO zcl_az_http_request.
+
+    "! How many times send( ) was invoked (useful for retry assertions).
+    METHODS get_call_count
+      RETURNING VALUE(rv_count) TYPE i.
+
+    "! Full request history (spy).
+    DATA mt_requests TYPE STANDARD TABLE OF REF TO zcl_az_http_request WITH EMPTY KEY READ-ONLY.
+
+  PRIVATE SECTION.
+
+    DATA mt_responses TYPE STANDARD TABLE OF REF TO zcl_az_http_response WITH EMPTY KEY.
+    DATA mv_calls     TYPE i.
+    DATA mo_error     TYPE REF TO zcx_az_http_error.
+
+ENDCLASS.
+
+
+
+CLASS zcl_az_http_client_mock IMPLEMENTATION.
+
+  METHOD zif_az_http_client~send.
+
+    mv_calls = mv_calls + 1.
+    APPEND io_request TO mt_requests.
+
+    IF mo_error IS BOUND.
+      RAISE EXCEPTION mo_error.
+    ENDIF.
+
+    DATA(lv_idx) = COND i( WHEN mv_calls <= lines( mt_responses )
+                           THEN mv_calls
+                           ELSE lines( mt_responses ) ).
+
+    IF lv_idx = 0.
+      " Unconfigured call: return an empty 200 so the pipeline stays happy.
+      ro_response = NEW zcl_az_http_response( iv_status_code = 200 ).
+    ELSE.
+      ro_response = mt_responses[ lv_idx ].
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD add_response.
+
+  DATA lt_headers TYPE zcl_az_http_response=>ty_t_headers.
+
+  IF iv_content_type IS NOT INITIAL.
+    APPEND |content-type:{ iv_content_type }| TO lt_headers.
+  ENDIF.
+
+  " merge any caller-supplied headers (ETag, Content-Length, ...)
+  APPEND LINES OF it_headers TO lt_headers.
+
+  APPEND NEW zcl_az_http_response(
+               iv_status_code = iv_status
+               iv_body        = iv_body
+               iv_body_bin    = iv_body_bin
+               it_headers     = lt_headers ) TO mt_responses.
+
+ENDMETHOD.
+
+
+  METHOD set_error.
+    mo_error = io_error.
+  ENDMETHOD.
+
+
+  METHOD get_last_request.
+    IF mt_requests IS NOT INITIAL.
+      ro_request = mt_requests[ lines( mt_requests ) ].
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD get_call_count.
+    rv_count = mv_calls.
+  ENDMETHOD.
+
+ENDCLASS.

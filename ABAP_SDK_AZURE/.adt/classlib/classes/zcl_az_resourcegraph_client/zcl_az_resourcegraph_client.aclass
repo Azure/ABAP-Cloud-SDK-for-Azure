@@ -1,0 +1,256 @@
+CLASS zcl_az_resourcegraph_client DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    INTERFACES zif_az_resourcegraph_service.
+    ALIASES query_resources FOR zif_az_resourcegraph_service~query_resources.
+    ALIASES resources       FOR zif_az_resourcegraph_service~resources.
+    ALIASES operations_list  FOR zif_az_resourcegraph_service~operations_list.
+
+    METHODS constructor
+      IMPORTING
+        io_credential    TYPE REF TO zif_az_token_credential
+        iv_endpoint      TYPE string DEFAULT 'https://management.azure.com'
+        it_extra_headers TYPE tihttpnvp OPTIONAL
+        iv_max_retries   TYPE i DEFAULT 3
+        io_http_client   TYPE REF TO zif_az_http_client OPTIONAL.
+
+  PROTECTED SECTION.
+
+    DATA mo_pipeline      TYPE REF TO zcl_az_http_pipeline.
+    DATA mv_uri_prefix    TYPE string.
+    DATA mt_extra_headers TYPE tihttpnvp.
+
+  PRIVATE SECTION.
+
+ENDCLASS.
+
+
+CLASS zcl_az_resourcegraph_client IMPLEMENTATION.
+
+  METHOD constructor.
+
+    DATA lt_policies TYPE zcl_az_http_pipeline=>tt_policies.
+
+    mv_uri_prefix    = iv_endpoint.
+    mt_extra_headers = it_extra_headers.
+
+    APPEND NEW zcl_az_policy_retry( iv_max_retries ) TO lt_policies.
+    APPEND NEW zcl_az_policy_auth(
+                 io_credential = io_credential
+                 iv_scope      = 'https://management.azure.com/.default' ) TO lt_policies.
+    APPEND NEW zcl_az_policy_logging( ) TO lt_policies.
+    " Transport is injectable (io_http_client) for unit tests.
+    APPEND NEW zcl_az_pipeline_trans_policy(
+                 COND #( WHEN io_http_client IS BOUND
+                         THEN io_http_client
+                         ELSE NEW zcl_az_http_client( ) ) ) TO lt_policies.
+
+    mo_pipeline = NEW zcl_az_http_pipeline( lt_policies ).
+
+  ENDMETHOD.
+
+
+  METHOD zif_az_resourcegraph_service~query_resources.
+
+    DATA lo_request TYPE REF TO zcl_az_http_request.
+
+    lo_request = NEW zcl_az_http_request( ).
+
+    lo_request->mv_method = 'POST'.
+    lo_request->mv_url    = mv_uri_prefix &&
+      '/providers/Microsoft.ResourceGraph/resources?api-version=2022-10-01'.
+
+    APPEND 'Content-Type:application/json'
+      TO lo_request->mt_headers.
+
+    APPEND 'Accept:application/json'
+      TO lo_request->mt_headers.
+
+    DATA lv_result_format TYPE string.
+
+    lv_result_format = iv_result_format.
+
+    IF lv_result_format IS INITIAL.
+      lv_result_format = 'objectArray'.
+    ENDIF.
+
+lo_request->mv_body =
+  zcl_az_rg_json_serializer=>serialize_query_request(
+    iv_query            = iv_query
+    it_subscriptions    = it_subscriptions
+    it_managementgroups = it_managementgroups
+    iv_result_format    = lv_result_format ).
+
+    DATA(lo_response) =
+      mo_pipeline->send( lo_request ).
+
+    IF lo_response->is_success( ) <> abap_true.
+      RAISE EXCEPTION TYPE zcx_az_service_error
+        EXPORTING
+          iv_message = lo_response->get_body( ).
+    ENDIF.
+
+    ro_result =
+      zcl_az_rg_json_serializer=>deserialize_query_result(
+        lo_response->get_body( )
+      ).
+
+  ENDMETHOD.
+
+  METHOD zif_az_resourcegraph_service~operations_list.
+    DATA lv_uri          TYPE string.
+    DATA ls_header       LIKE LINE OF mt_extra_headers.
+    DATA lv_dummy        TYPE string.
+    DATA lv_content_type TYPE string.
+    DATA lo_request  TYPE REF TO zcl_az_http_request.
+    DATA lo_response TYPE REF TO zcl_az_http_response.
+    lo_request = NEW zcl_az_http_request( ).
+
+    TRY.
+    lo_request->mv_method = 'GET'.
+    lv_uri = mv_uri_prefix && '/providers/Microsoft.ResourceGraph/operations'.
+    IF api_version IS NOT INITIAL.
+      lv_uri = lv_uri && COND string( WHEN lv_uri CS '?' THEN '&' ELSE '?' )
+                      && |api-version={ api_version }|.
+    ENDIF.
+    lo_request->mv_url = lv_uri.
+    LOOP AT mt_extra_headers INTO ls_header.
+      APPEND |{ ls_header-name }:{ ls_header-value }| TO lo_request->mt_headers.
+    ENDLOOP.
+    lo_response = mo_pipeline->send( lo_request ).
+
+    " surface service-side failures as typed SDK exceptions (zcx_az_*)
+    IF lo_response->is_success( ) <> abap_true.
+      RAISE EXCEPTION TYPE zcx_az_service_error
+        EXPORTING iv_message = lo_response->get_body( ).
+    ENDIF.
+
+    return-code     = lo_response->get_status_code( ).
+    lv_content_type = lo_response->get_header( 'Content-Type' ).
+    CASE return-code.
+      WHEN 200. " The request has succeeded.
+        SPLIT lv_content_type AT ';' INTO lv_content_type lv_dummy.
+        CASE lv_content_type.
+          WHEN 'application/json'.
+            /ui2/cl_json=>deserialize(
+              EXPORTING
+                json        = lo_response->get_body( )
+                pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+              CHANGING
+                data        = return-_200_app_json ).
+            " Resource Graph returns query_response-data as a JSON ARRAY, which the
+            " generated `data TYPE string` field cannot hold (left blank). Preserve
+            " the full payload so callers can read the actual rows.
+            return-raw_body = lo_response->get_body( ).
+          WHEN OTHERS.
+* unexpected content type
+        ENDCASE.
+      WHEN OTHERS.
+        SPLIT lv_content_type AT ';' INTO lv_content_type lv_dummy.
+        CASE lv_content_type.
+          WHEN 'application/json'.
+            /ui2/cl_json=>deserialize(
+              EXPORTING
+                json        = lo_response->get_body( )
+                pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+              CHANGING
+                data        = return-_default_app_json ).
+          WHEN OTHERS.
+* unexpected content type
+        ENDCASE.
+    ENDCASE.
+
+      CATCH zcx_azure INTO DATA(lx_az_err).
+        RAISE EXCEPTION lx_az_err.
+      CATCH cx_root INTO DATA(lx_sdk_err).
+        RAISE EXCEPTION TYPE zcx_az_serialization_error
+          EXPORTING
+            iv_message = |Failed to process response: { lx_sdk_err->get_text( ) }|
+            previous   = lx_sdk_err.
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD zif_az_resourcegraph_service~resources.
+    DATA lv_uri          TYPE string.
+    DATA ls_header       LIKE LINE OF mt_extra_headers.
+    DATA lv_dummy        TYPE string.
+    DATA lv_content_type TYPE string.
+    DATA lo_request  TYPE REF TO zcl_az_http_request.
+    DATA lo_response TYPE REF TO zcl_az_http_response.
+    lo_request = NEW zcl_az_http_request( ).
+
+    TRY.
+    lo_request->mv_method = 'POST'.
+    lv_uri = mv_uri_prefix && '/providers/Microsoft.ResourceGraph/resources'.
+    IF api_version IS NOT INITIAL.
+      lv_uri = lv_uri && COND string( WHEN lv_uri CS '?' THEN '&' ELSE '?' )
+                      && |api-version={ api_version }|.
+    ENDIF.
+    lo_request->mv_url = lv_uri.
+    LOOP AT mt_extra_headers INTO ls_header.
+      APPEND |{ ls_header-name }:{ ls_header-value }| TO lo_request->mt_headers.
+    ENDLOOP.
+    APPEND 'Content-Type:application/json' TO lo_request->mt_headers.
+    lo_request->mv_body = /ui2/cl_json=>serialize(
+      data          = body
+      ts_as_iso8601 = abap_true
+      pretty_name   = /ui2/cl_json=>pretty_mode-camel_case ).
+    lo_response = mo_pipeline->send( lo_request ).
+
+    " surface service-side failures as typed SDK exceptions (zcx_az_*)
+    IF lo_response->is_success( ) <> abap_true.
+      RAISE EXCEPTION TYPE zcx_az_service_error
+        EXPORTING iv_message = lo_response->get_body( ).
+    ENDIF.
+
+    return-code     = lo_response->get_status_code( ).
+    lv_content_type = lo_response->get_header( 'Content-Type' ).
+    CASE return-code.
+      WHEN 200. " The request has succeeded.
+        SPLIT lv_content_type AT ';' INTO lv_content_type lv_dummy.
+        CASE lv_content_type.
+          WHEN 'application/json'.
+            /ui2/cl_json=>deserialize(
+              EXPORTING
+                json        = lo_response->get_body( )
+                pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+              CHANGING
+                data        = return-_200_app_json ).
+            " Resource Graph returns query_response-data as a JSON ARRAY, which the
+            " generated `data TYPE string` field cannot hold (left blank). Preserve
+            " the full payload so callers can read the actual rows.
+            return-raw_body = lo_response->get_body( ).
+          WHEN OTHERS.
+* unexpected content type
+        ENDCASE.
+      WHEN OTHERS.
+        SPLIT lv_content_type AT ';' INTO lv_content_type lv_dummy.
+        CASE lv_content_type.
+          WHEN 'application/json'.
+            /ui2/cl_json=>deserialize(
+              EXPORTING
+                json        = lo_response->get_body( )
+                pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+              CHANGING
+                data        = return-_default_app_json ).
+          WHEN OTHERS.
+* unexpected content type
+        ENDCASE.
+    ENDCASE.
+
+      CATCH zcx_azure INTO DATA(lx_az_err).
+        RAISE EXCEPTION lx_az_err.
+      CATCH cx_root INTO DATA(lx_sdk_err).
+        RAISE EXCEPTION TYPE zcx_az_serialization_error
+          EXPORTING
+            iv_message = |Failed to process response: { lx_sdk_err->get_text( ) }|
+            previous   = lx_sdk_err.
+    ENDTRY.
+  ENDMETHOD.
+
+ENDCLASS.

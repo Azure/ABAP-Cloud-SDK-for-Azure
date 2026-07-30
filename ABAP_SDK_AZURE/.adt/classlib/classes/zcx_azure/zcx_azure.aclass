@@ -1,0 +1,43 @@
+CLASS zcx_azure DEFINITION
+  PUBLIC
+  INHERITING FROM cx_static_check
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    DATA mv_error_code TYPE string.
+    DATA mv_message    TYPE string.
+
+    METHODS constructor
+      IMPORTING
+        iv_message    TYPE string   OPTIONAL
+        iv_error_code TYPE string   OPTIONAL
+        previous      TYPE REF TO cx_root OPTIONAL.
+
+    METHODS get_text REDEFINITION.
+
+ENDCLASS.
+
+
+
+CLASS ZCX_AZURE IMPLEMENTATION.
+
+
+  METHOD constructor ##ADT_SUPPRESS_GENERATION.
+
+    super->constructor( previous = previous ).
+
+    mv_message    = iv_message.
+    mv_error_code = iv_error_code.
+
+  ENDMETHOD.
+
+  METHOD get_text.
+    IF mv_message IS NOT INITIAL.
+      result = mv_message.
+    ELSE.
+      result = super->get_text( ).
+    ENDIF.
+  ENDMETHOD.
+
+ENDCLASS.

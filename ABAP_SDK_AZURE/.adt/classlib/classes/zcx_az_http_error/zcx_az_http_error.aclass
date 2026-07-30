@@ -1,0 +1,35 @@
+CLASS zcx_az_http_error DEFINITION
+  PUBLIC
+  INHERITING FROM zcx_azure
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    DATA mv_status_code TYPE i.
+    DATA mv_response_body TYPE string.
+
+    METHODS constructor
+      IMPORTING
+        iv_status_code   TYPE i
+        iv_response_body TYPE string OPTIONAL
+        iv_message       TYPE string OPTIONAL
+        previous         TYPE REF TO cx_root OPTIONAL.
+
+ENDCLASS.
+
+
+
+CLASS ZCX_AZ_HTTP_ERROR IMPLEMENTATION.
+
+
+  METHOD constructor ##ADT_SUPPRESS_GENERATION.
+
+    super->constructor(
+        iv_message = iv_message
+        previous   = previous ).
+
+    mv_status_code   = iv_status_code.
+    mv_response_body = iv_response_body.
+
+  ENDMETHOD.
+ENDCLASS.

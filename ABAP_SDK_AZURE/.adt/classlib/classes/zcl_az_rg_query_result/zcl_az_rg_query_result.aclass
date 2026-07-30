@@ -1,0 +1,21 @@
+CLASS zcl_az_rg_query_result DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+    TYPES ty_t_rows TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+
+    DATA mt_rows          TYPE ty_t_rows.
+    DATA mv_count         TYPE i.
+    DATA mv_total_records TYPE i.
+    DATA mv_skip_token    TYPE string.
+    DATA mv_result_format TYPE string.
+
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+ENDCLASS.
+
+CLASS zcl_az_rg_query_result IMPLEMENTATION.
+ENDCLASS.

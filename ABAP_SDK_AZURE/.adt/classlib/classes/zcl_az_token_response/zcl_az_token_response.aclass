@@ -1,0 +1,17 @@
+CLASS zcl_az_token_response DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
+
+  PUBLIC SECTION.
+    TYPES: BEGIN OF ty_response,
+             access_token TYPE string,
+             token_type   TYPE string,
+             expires_in   TYPE i,
+           END OF ty_response.
+ENDCLASS.
+
+
+
+CLASS ZCL_AZ_TOKEN_RESPONSE IMPLEMENTATION.
+ENDCLASS.

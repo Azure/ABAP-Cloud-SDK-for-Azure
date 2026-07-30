@@ -1,0 +1,47 @@
+CLASS zcl_az_http_pipeline DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+     TYPES tt_policies TYPE STANDARD TABLE OF REF TO zif_az_http_pipeline_policy WITH EMPTY KEY.
+
+    METHODS constructor
+      IMPORTING
+        it_policies TYPE tt_policies.
+
+    METHODS send
+      IMPORTING
+        io_request TYPE REF TO zcl_az_http_request
+      RETURNING
+        VALUE(ro_response) TYPE REF TO zcl_az_http_response
+        RAISING zcx_az_http_error.
+
+  PRIVATE SECTION.
+
+    DATA mt_policies TYPE tt_policies.
+
+ENDCLASS.
+
+
+
+CLASS ZCL_AZ_HTTP_PIPELINE IMPLEMENTATION.
+
+
+METHOD constructor.
+  mt_policies = it_policies.
+ENDMETHOD.
+
+
+METHOD send.
+
+  DATA(lo_context) =
+    NEW zcl_az_pipeline_context(
+        mt_policies ).
+
+  ro_response =
+    lo_context->next( io_request ).
+
+ENDMETHOD.
+ENDCLASS.

@@ -1,0 +1,173 @@
+CLASS ZCL_AZ_HTTP_CLIENT DEFINITION
+   PUBLIC
+   FINAL
+   CREATE PUBLIC.
+
+   PUBLIC SECTION.
+
+     INTERFACES zif_az_http_client.
+
+     "! True for a body-less write request (POST/PUT with no payload). Such
+     "! requests must advertise Content-Length: 0 or the Azure gateway rejects
+     "! them with HTTP 411 'Length Required'. Pure, unit-testable.
+     CLASS-METHODS needs_zero_length_body
+       IMPORTING io_request       TYPE REF TO zcl_az_http_request
+       RETURNING VALUE(rv_needed) TYPE abap_bool.
+
+     "! Flatten the web response header fields into the SDK's `name:value` lines
+     "! so zcl_az_http_response->get_header can resolve them. Pure, unit-testable.
+     CLASS-METHODS to_header_lines
+       IMPORTING it_fields         TYPE if_web_http_request=>name_value_pairs
+       RETURNING VALUE(rt_headers) TYPE zcl_az_http_response=>ty_t_headers.
+
+ ENDCLASS.
+
+
+
+ CLASS ZCL_AZ_HTTP_CLIENT IMPLEMENTATION.
+
+
+ METHOD zif_az_http_client~send.
+
+   DATA: lo_http_client   TYPE REF TO if_web_http_client,
+         lo_http_request  TYPE REF TO if_web_http_request,
+         lo_http_response TYPE REF TO if_web_http_response,
+         lo_http_dest     TYPE REF TO if_http_destination.
+
+   DATA lv_method TYPE if_web_http_client=>method.
+
+   DATA lo_response TYPE REF TO zcl_az_http_response.
+
+   " Guard: request must be bound
+   IF io_request IS INITIAL.
+     RAISE EXCEPTION TYPE zcx_az_http_error
+       EXPORTING
+         iv_status_code = 0
+         iv_message     = |Invalid request: request is not bound.|.
+   ENDIF.
+
+   TRY.
+       lo_http_dest =
+          cl_http_destination_provider=>create_by_url(
+             io_request->mv_url ).
+
+       lo_http_client =
+          cl_web_http_client_manager=>create_by_http_destination(
+             lo_http_dest ).
+
+       lo_http_request = lo_http_client->get_http_request( ).
+
+       lo_http_request->set_header_field(
+        i_name  = 'User-Agent'
+        i_value = 'SAP-Azure-Cloud-Client/1.0' ).
+
+       CASE io_request->mv_method.
+         WHEN 'GET'.
+           lv_method = if_web_http_client=>get.
+         WHEN 'POST'.
+           lv_method = if_web_http_client=>post.
+         WHEN 'PUT'.
+           lv_method = if_web_http_client=>put.
+         WHEN 'DELETE'.
+           lv_method = if_web_http_client=>delete.
+       ENDCASE.
+
+       LOOP AT io_request->mt_headers INTO DATA(lv_header).
+         SPLIT lv_header AT ':' INTO DATA(lv_key) DATA(lv_val).
+         CONDENSE lv_key.
+         CONDENSE lv_val.
+
+         lo_http_request->set_header_field(
+            i_name  = lv_key
+            i_value = lv_val ).
+       ENDLOOP.
+
+       IF io_request->mv_body_bin IS NOT INITIAL.
+         lo_http_request->set_binary( io_request->mv_body_bin ).
+       ELSEIF io_request->mv_body IS NOT INITIAL.
+         lo_http_request->set_text( io_request->mv_body ).
+       ELSEIF needs_zero_length_body( io_request ) = abap_true.
+         " Body-less write requests (e.g. Azure action endpoints POST .../start)
+         " are rejected with HTTP 411 'Length Required' unless a content length is
+         " present. Advertise an explicit zero length for the empty body.
+         lo_http_request->set_text( '' ).
+         lo_http_request->set_header_field(
+            i_name  = 'Content-Length'
+            i_value = '0' ).
+       ENDIF.
+
+       lo_http_response =
+           lo_http_client->execute( i_method = lv_method ).
+
+     CATCH cx_web_http_client_error INTO DATA(lx_http_error).
+       RAISE EXCEPTION TYPE zcx_az_http_error
+         EXPORTING
+           iv_status_code = 0
+           iv_message     = lx_http_error->get_text( )
+           previous       = lx_http_error.
+
+     CATCH cx_root INTO DATA(lx_error).
+       RAISE EXCEPTION TYPE zcx_az_http_error
+         EXPORTING
+           iv_status_code = 0
+           iv_message     = |Unexpected error during HTTP transport - { lx_error->get_text( ) }  .|
+           previous       = lx_error.
+   ENDTRY.
+
+   " Defensive: a successful execute must still yield a bound response
+   IF lo_http_response IS NOT BOUND.
+     RAISE EXCEPTION TYPE zcx_az_http_error
+       EXPORTING
+         iv_status_code = 0
+         iv_message     = |Transport returned no response. Please check your network connection or server status. Please ensure your request is correct.|.
+   ENDIF.
+
+   " Content-type-aware capture: textual payloads (json/xml/text) as a string,
+   " binary payloads (octet-stream, image/*, zip, ...) as xstring â so binary
+   " bodies (e.g. blob downloads) are not corrupted by a text decode.
+
+   " Propagate the response headers so downstream consumers (e.g. the generated
+   " client's Content-Type dispatch) can read them via zcl_az_http_response->get_header.
+   DATA lt_resp_headers TYPE zcl_az_http_response=>ty_t_headers.
+   TRY.
+       lt_resp_headers = to_header_lines( lo_http_response->get_header_fields( ) ).
+     CATCH cx_root.
+       CLEAR lt_resp_headers.
+   ENDTRY.
+
+   DATA(lv_content_type) =
+     lo_http_response->get_header_field( 'content-type' ).
+
+   IF zcl_az_http_response=>is_textual_content_type( lv_content_type ) = abap_true.
+     lo_response = NEW zcl_az_http_response(
+                        iv_status_code = lo_http_response->get_status( )-code
+                        iv_body        = lo_http_response->get_text( )
+                        it_headers     = lt_resp_headers ).
+   ELSE.
+     lo_response = NEW zcl_az_http_response(
+                        iv_status_code = lo_http_response->get_status( )-code
+                        iv_body_bin    = lo_http_response->get_binary( )
+                        it_headers     = lt_resp_headers ).
+   ENDIF.
+
+   ro_response = lo_response.
+
+ ENDMETHOD.
+
+
+ METHOD needs_zero_length_body.
+   rv_needed = boolc(
+     io_request IS BOUND
+     AND io_request->mv_body     IS INITIAL
+     AND io_request->mv_body_bin IS INITIAL
+     AND ( io_request->mv_method = 'POST' OR io_request->mv_method = 'PUT' ) ).
+ ENDMETHOD.
+
+
+ METHOD to_header_lines.
+   LOOP AT it_fields INTO DATA(ls_field).
+     APPEND |{ ls_field-name }:{ ls_field-value }| TO rt_headers.
+   ENDLOOP.
+ ENDMETHOD.
+
+ ENDCLASS.

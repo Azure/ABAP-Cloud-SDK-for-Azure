@@ -1,0 +1,2352 @@
+INTERFACE zif_az_blob_service PUBLIC.
+* Title: Azure Blob Storage
+* Version: 2026-06-06
+
+  CONSTANTS base_path TYPE string VALUE 'https://{url}'.
+
+* GeoReplication
+* Enum: geo_replication-status
+  CONSTANTS: BEGIN OF c_enum_geo_replication_statu,
+               live TYPE string VALUE 'live',
+               bootstrap TYPE string VALUE 'bootstrap',
+               unavailable TYPE string VALUE 'unavailable',
+             END OF c_enum_geo_replication_statu.
+  TYPES: BEGIN OF geo_replication,
+           status TYPE string,
+           last_sync_time TYPE string,
+         END OF geo_replication.
+* StorageServiceStats
+  TYPES: BEGIN OF storage_service_stats,
+           geo_replication TYPE geo_replication,
+         END OF storage_service_stats.
+* StaticWebsite
+  TYPES: BEGIN OF static_website,
+           enabled TYPE abap_bool,
+           index_document TYPE string,
+           error_document404_path TYPE string,
+           default_index_document_path TYPE string,
+         END OF static_website.
+* RetentionPolicy
+  TYPES: BEGIN OF retention_policy,
+           enabled TYPE abap_bool,
+           days TYPE i,
+           allow_permanent_delete TYPE abap_bool,
+         END OF retention_policy.
+* Metrics
+  TYPES metrics TYPE string.
+* Logging
+  TYPES: BEGIN OF logging,
+           version TYPE string,
+           delete TYPE abap_bool,
+           read TYPE abap_bool,
+           write TYPE abap_bool,
+           retention_policy TYPE retention_policy,
+         END OF logging.
+* CorsRule
+  TYPES: BEGIN OF cors_rule,
+           allowed_origins TYPE string,
+           allowed_methods TYPE string,
+           allowed_headers TYPE string,
+           exposed_headers TYPE string,
+           max_age_in_seconds TYPE i,
+         END OF cors_rule.
+* StorageServiceProperties
+  TYPES: BEGIN OF storage_service_properties,
+           logging TYPE logging,
+           hour_metrics TYPE metrics,
+           minute_metrics TYPE metrics,
+           cors TYPE STANDARD TABLE OF cors_rule WITH DEFAULT KEY,
+           default_service_version TYPE string,
+           delete_retention_policy TYPE retention_policy,
+           static_website TYPE static_website,
+         END OF storage_service_properties.
+* AccessPolicy
+  TYPES: BEGIN OF access_policy,
+           start TYPE timestampl,
+           expiry TYPE timestampl,
+           permission TYPE string,
+         END OF access_policy.
+* SignedIdentifier
+  TYPES: BEGIN OF signed_identifier,
+           id TYPE string,
+           access_policy TYPE access_policy,
+         END OF signed_identifier.
+* SignedIdentifiers
+  TYPES signed_identifiers TYPE STANDARD TABLE OF signed_identifier WITH DEFAULT KEY.
+* RehydratePriority
+  TYPES rehydrate_priority TYPE string.
+* QueryType
+  TYPES query_type TYPE string.
+* ArrowField
+  TYPES: BEGIN OF arrow_field,
+           type TYPE string,
+           name TYPE string,
+           precision TYPE i,
+           scale TYPE i,
+         END OF arrow_field.
+* ParquetConfiguration
+  TYPES: BEGIN OF parquet_configuration,
+           dummy_workaround TYPE i,
+         END OF parquet_configuration.
+* ArrowConfiguration
+  TYPES: BEGIN OF arrow_configuration,
+           schema TYPE STANDARD TABLE OF arrow_field WITH DEFAULT KEY,
+         END OF arrow_configuration.
+* JsonTextConfiguration
+  TYPES: BEGIN OF json_text_configuration,
+           record_separator TYPE string,
+         END OF json_text_configuration.
+* DelimitedTextConfiguration
+  TYPES: BEGIN OF delimited_text_configuration,
+           column_separator TYPE string,
+           field_quote TYPE string,
+           record_separator TYPE string,
+           escape_char TYPE string,
+           headers_present TYPE abap_bool,
+         END OF delimited_text_configuration.
+* QueryFormat
+  TYPES: BEGIN OF query_format,
+           type TYPE query_type,
+           delimited_text_configuration TYPE delimited_text_configuration,
+           json_text_configuration TYPE json_text_configuration,
+           arrow_configuration TYPE arrow_configuration,
+           parquet_text_configuration TYPE parquet_configuration,
+         END OF query_format.
+* QuerySerialization
+  TYPES: BEGIN OF query_serialization,
+           format TYPE query_format,
+         END OF query_serialization.
+* QueryRequest
+* Enum: query_request-query_type
+  CONSTANTS: BEGIN OF c_enum_query_request_query_t,
+               sql TYPE string VALUE 'SQL',
+             END OF c_enum_query_request_query_t.
+  TYPES: BEGIN OF query_request,
+           query_type TYPE string,
+           expression TYPE string,
+           input_serialization TYPE query_serialization,
+           output_serialization TYPE query_serialization,
+         END OF query_request.
+* ClearRange
+  TYPES: BEGIN OF clear_range,
+           start TYPE i,
+           end TYPE i,
+         END OF clear_range.
+* PageRange
+  TYPES: BEGIN OF page_range,
+           start TYPE i,
+           end TYPE i,
+         END OF page_range.
+* PageList
+  TYPES: BEGIN OF page_list,
+           page_range TYPE STANDARD TABLE OF page_range WITH DEFAULT KEY,
+           clear_range TYPE STANDARD TABLE OF clear_range WITH DEFAULT KEY,
+           next_marker TYPE string,
+         END OF page_list.
+* ObjectReplicationMetadata
+  TYPES: BEGIN OF object_replication_metadata,
+           dummy_workaround TYPE i,
+         END OF object_replication_metadata.
+* BlobMetadata
+  TYPES: BEGIN OF blob_metadata,
+           encrypted TYPE string,
+         END OF blob_metadata.
+* ContainerMetadata
+  TYPES: BEGIN OF container_metadata,
+           dummy_workaround TYPE i,
+         END OF container_metadata.
+* BlobTag
+  TYPES: BEGIN OF blob_tag,
+           key TYPE string,
+           value TYPE string,
+         END OF blob_tag.
+* BlobTags
+  TYPES: BEGIN OF blob_tags,
+           blob_tag_set TYPE STANDARD TABLE OF blob_tag WITH DEFAULT KEY,
+         END OF blob_tags.
+* FilterBlobItem
+  TYPES: BEGIN OF filter_blob_item,
+           name TYPE string,
+           container_name TYPE string,
+           tags TYPE blob_tags,
+           version_id TYPE string,
+           is_current_version TYPE abap_bool,
+         END OF filter_blob_item.
+* FilterBlobSegment
+  TYPES: BEGIN OF filter_blob_segment,
+           service_endpoint TYPE string,
+           where TYPE string,
+           blobs TYPE STANDARD TABLE OF filter_blob_item WITH DEFAULT KEY,
+           next_marker TYPE string,
+         END OF filter_blob_segment.
+* ErrorCode
+  TYPES error_code TYPE string.
+* LeaseStatus
+  TYPES lease_status TYPE string.
+* LeaseState
+  TYPES lease_state TYPE string.
+* LeaseDuration
+  TYPES lease_duration TYPE string.
+* PublicAccessType
+  TYPES public_access_type TYPE string.
+* ContainerProperties
+  TYPES: BEGIN OF container_properties,
+           last__modified TYPE string,
+           etag TYPE string,
+           lease_status TYPE lease_status,
+           lease_state TYPE lease_state,
+           lease_duration TYPE lease_duration,
+           public_access TYPE public_access_type,
+           has_immutability_policy TYPE abap_bool,
+           has_legal_hold TYPE abap_bool,
+           default_encryption_scope TYPE string,
+           deny_encryption_scope_overri TYPE abap_bool,
+           deleted_time TYPE string,
+           remaining_retention_days TYPE i,
+           immutable_storage_with_versi TYPE abap_bool,
+         END OF container_properties.
+* ContainerItem
+  TYPES: BEGIN OF container_item,
+           name TYPE string,
+           deleted TYPE abap_bool,
+           version TYPE string,
+           properties TYPE container_properties,
+           metadata TYPE container_metadata,
+         END OF container_item.
+* ListContainersSegmentResponse
+  TYPES: BEGIN OF list_containers_segment_resp,
+           service_endpoint TYPE string,
+           prefix TYPE string,
+           marker TYPE string,
+           max_results TYPE i,
+           container_items TYPE STANDARD TABLE OF container_item WITH DEFAULT KEY,
+           next_marker TYPE string,
+         END OF list_containers_segment_resp.
+* BlockLookupList
+  TYPES: BEGIN OF block_lookup_list,
+           committed TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+           uncommitted TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+           latest TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+         END OF block_lookup_list.
+* Block
+  TYPES: BEGIN OF block,
+           name TYPE string,
+           size TYPE i,
+         END OF block.
+* BlockList
+  TYPES: BEGIN OF block_list,
+           committed_blocks TYPE STANDARD TABLE OF block WITH DEFAULT KEY,
+           uncommitted_blocks TYPE STANDARD TABLE OF block WITH DEFAULT KEY,
+         END OF block_list.
+* BlobName
+  TYPES: BEGIN OF blob_name,
+           encoded TYPE abap_bool,
+           content TYPE string,
+         END OF blob_name.
+* BlobPrefix
+  TYPES: BEGIN OF blob_prefix,
+           name TYPE blob_name,
+         END OF blob_prefix.
+* ArchiveStatus
+  TYPES archive_status TYPE string.
+* AccessTier
+  TYPES access_tier TYPE string.
+* CopyStatus
+  TYPES copy_status TYPE string.
+* BlobPropertiesInternal
+* Enum: blob_properties_internal-blob_type
+  CONSTANTS: BEGIN OF c_enum_blob_properties_inter,
+               blockblob TYPE string VALUE 'BlockBlob',
+               pageblob TYPE string VALUE 'PageBlob',
+               appendblob TYPE string VALUE 'AppendBlob',
+             END OF c_enum_blob_properties_inter.
+* Enum: blob_properties_internal-immutability_policy_mode
+  CONSTANTS: BEGIN OF c_enum_blob_properties_int01,
+               mutable TYPE string VALUE 'Mutable',
+               unlocked TYPE string VALUE 'Unlocked',
+               locked TYPE string VALUE 'Locked',
+             END OF c_enum_blob_properties_int01.
+  TYPES: BEGIN OF blob_properties_internal,
+           creation__time TYPE string,
+           last__modified TYPE string,
+           etag TYPE string,
+           content__length TYPE i,
+           content__type TYPE string,
+           content__encoding TYPE string,
+           content__language TYPE string,
+           content_md5 TYPE string,
+           content__disposition TYPE string,
+           cache__control TYPE string,
+           x_ms_blob_sequence_number TYPE i,
+           blob_type TYPE string,
+           lease_status TYPE lease_status,
+           lease_state TYPE lease_state,
+           lease_duration TYPE lease_duration,
+           copy_id TYPE string,
+           copy_status TYPE copy_status,
+           copy_source TYPE string,
+           copy_progress TYPE string,
+           copy_completion_time TYPE string,
+           copy_status_description TYPE string,
+           server_encrypted TYPE abap_bool,
+           incremental_copy TYPE abap_bool,
+           destination_snapshot TYPE string,
+           deleted_time TYPE string,
+           remaining_retention_days TYPE i,
+           access_tier TYPE access_tier,
+           access_tier_inferred TYPE abap_bool,
+           archive_status TYPE archive_status,
+           smart_access_tier TYPE access_tier,
+           customer_provided_key_sha256 TYPE string,
+           encryption_scope TYPE string,
+           access_tier_change_time TYPE string,
+           tag_count TYPE i,
+           expiry__time TYPE string,
+           sealed TYPE abap_bool,
+           rehydrate_priority TYPE rehydrate_priority,
+           last_access_time TYPE string,
+           immutability_policy_until_da TYPE string,
+           immutability_policy_mode TYPE string,
+           legal_hold TYPE abap_bool,
+         END OF blob_properties_internal.
+* BlobItemInternal
+  TYPES: BEGIN OF blob_item_internal,
+           name TYPE blob_name,
+           deleted TYPE abap_bool,
+           snapshot TYPE string,
+           version_id TYPE string,
+           is_current_version TYPE abap_bool,
+           properties TYPE blob_properties_internal,
+           metadata TYPE blob_metadata,
+           blob_tags TYPE blob_tags,
+           object_replication_metadata TYPE object_replication_metadata,
+           has_versions_only TYPE abap_bool,
+         END OF blob_item_internal.
+* BlobHierarchyListSegment
+  TYPES: BEGIN OF blob_hierarchy_list_segment,
+           blob_prefixes TYPE STANDARD TABLE OF blob_prefix WITH DEFAULT KEY,
+           blob_items TYPE STANDARD TABLE OF blob_item_internal WITH DEFAULT KEY,
+         END OF blob_hierarchy_list_segment.
+* BlobFlatListSegment
+  TYPES: BEGIN OF blob_flat_list_segment,
+           blob_items TYPE STANDARD TABLE OF blob_item_internal WITH DEFAULT KEY,
+         END OF blob_flat_list_segment.
+* ListBlobsHierarchySegmentResponse
+  TYPES: BEGIN OF list_blobs_hierarchy_segment,
+           service_endpoint TYPE string,
+           container_name TYPE string,
+           prefix TYPE string,
+           marker TYPE string,
+           max_results TYPE i,
+           delimiter TYPE string,
+           segment TYPE blob_hierarchy_list_segment,
+           next_marker TYPE string,
+         END OF list_blobs_hierarchy_segment.
+* ListBlobsFlatSegmentResponse
+  TYPES: BEGIN OF list_blobs_flat_segment_resp,
+           service_endpoint TYPE string,
+           container_name TYPE string,
+           prefix TYPE string,
+           marker TYPE string,
+           max_results TYPE i,
+           segment TYPE blob_flat_list_segment,
+           next_marker TYPE string,
+         END OF list_blobs_flat_segment_resp.
+* StorageError
+  TYPES: BEGIN OF storage_error,
+           message TYPE string,
+           copy_source_status_code TYPE i,
+           copy_source_error_code TYPE string,
+           copy_source_error_message TYPE string,
+         END OF storage_error.
+* UserDelegationKey
+  TYPES: BEGIN OF user_delegation_key,
+           signed_oid TYPE string,
+           signed_tid TYPE string,
+           signed_start TYPE timestampl,
+           signed_expiry TYPE timestampl,
+           signed_service TYPE string,
+           signed_version TYPE string,
+           signed_delegated_user_tid TYPE string,
+           value TYPE string,
+         END OF user_delegation_key.
+* KeyInfo
+  TYPES: BEGIN OF key_info,
+           start TYPE string,
+           expiry TYPE string,
+           delegated_user_tid TYPE string,
+         END OF key_info.
+
+  TYPES: BEGIN OF r_service_setproperties,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_service_setproperties.
+  METHODS service_setproperties
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      body TYPE storage_service_properties
+    RETURNING
+      VALUE(return) TYPE r_service_setproperties
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_service_getproperties,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE storage_service_properties,
+           _default_app_xml TYPE storage_error,
+         END OF r_service_getproperties.
+  METHODS service_getproperties
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_service_getproperties
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_service_getstatistics,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE storage_service_stats,
+           _default_app_xml TYPE storage_error,
+         END OF r_service_getstatistics.
+  METHODS service_getstatistics
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_service_getstatistics
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_service_listcontainerssegmen,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE list_containers_segment_resp,
+           _default_app_xml TYPE storage_error,
+         END OF r_service_listcontainerssegmen.
+  METHODS service_listcontainerssegmen
+    IMPORTING
+      comp TYPE string
+      prefix TYPE string OPTIONAL
+      marker TYPE string OPTIONAL
+      maxresults TYPE i OPTIONAL
+      include TYPE string_table OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_service_listcontainerssegmen
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_service_getuserdelegationkey,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE user_delegation_key,
+           _default_app_xml TYPE storage_error,
+         END OF r_service_getuserdelegationkey.
+  METHODS service_getuserdelegationkey
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      body TYPE key_info
+    RETURNING
+      VALUE(return) TYPE r_service_getuserdelegationkey
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_service_getaccountinfo,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_service_getaccountinfo.
+  METHODS service_getaccountinfo
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_service_getaccountinfo
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_service_submitbatch,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_service_submitbatch.
+  METHODS service_submitbatch
+    IMPORTING
+      comp TYPE string
+      content__length TYPE i
+      content__type TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      body TYPE xstring
+    RETURNING
+      VALUE(return) TYPE r_service_submitbatch
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_service_filterblobs,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE filter_blob_segment,
+           _default_app_xml TYPE storage_error,
+         END OF r_service_filterblobs.
+  METHODS service_filterblobs
+    IMPORTING
+      comp TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      where TYPE string OPTIONAL
+      marker TYPE string OPTIONAL
+      maxresults TYPE i OPTIONAL
+      include TYPE string_table OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_service_filterblobs
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_create,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_create.
+  METHODS container_create
+    IMPORTING
+      restype TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_meta TYPE string OPTIONAL
+      x_ms_blob_public_access TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_default_encryption_scop TYPE string OPTIONAL
+      x_ms_deny_encryption_scope_o TYPE abap_bool OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_create
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_getproperties,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_getproperties.
+  METHODS container_getproperties
+    IMPORTING
+      restype TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_getproperties
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_delete,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_delete.
+  METHODS container_delete
+    IMPORTING
+      restype TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_delete
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_setmetadata,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_setmetadata.
+  METHODS container_setmetadata
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_meta TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_setmetadata
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_getaccesspolicy,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE signed_identifiers,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_getaccesspolicy.
+  METHODS container_getaccesspolicy
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_getaccesspolicy
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_setaccesspolicy,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_setaccesspolicy.
+  METHODS container_setaccesspolicy
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_blob_public_access TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      body TYPE signed_identifiers
+    RETURNING
+      VALUE(return) TYPE r_container_setaccesspolicy
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_restore,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_restore.
+  METHODS container_restore
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_deleted_container_name TYPE string OPTIONAL
+      x_ms_deleted_container_versi TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_restore
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_rename,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_rename.
+  METHODS container_rename
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_source_container_name TYPE string
+      x_ms_source_lease_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_rename
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_submitbatch,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _202_app_xml TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_submitbatch.
+  METHODS container_submitbatch
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      container_name TYPE string
+      content__length TYPE i
+      content__type TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      body TYPE xstring
+    RETURNING
+      VALUE(return) TYPE r_container_submitbatch
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_filterblobs,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE filter_blob_segment,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_filterblobs.
+  METHODS container_filterblobs
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      where TYPE string OPTIONAL
+      marker TYPE string OPTIONAL
+      maxresults TYPE i OPTIONAL
+      include TYPE string_table OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_filterblobs
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_acquirelease,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_acquirelease.
+  METHODS container_acquirelease
+    IMPORTING
+      comp TYPE string
+      restype TYPE string
+      x_ms_lease_action TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_duration TYPE i OPTIONAL
+      x_ms_proposed_lease_id TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_acquirelease
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_releaselease,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_releaselease.
+  METHODS container_releaselease
+    IMPORTING
+      comp TYPE string
+      restype TYPE string
+      x_ms_lease_action TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_releaselease
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_renewlease,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_renewlease.
+  METHODS container_renewlease
+    IMPORTING
+      comp TYPE string
+      restype TYPE string
+      x_ms_lease_action TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_renewlease
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_breaklease,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_breaklease.
+  METHODS container_breaklease
+    IMPORTING
+      comp TYPE string
+      restype TYPE string
+      x_ms_lease_action TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_break_period TYPE i OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_breaklease
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_changelease,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_changelease.
+  METHODS container_changelease
+    IMPORTING
+      comp TYPE string
+      restype TYPE string
+      x_ms_lease_action TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string
+      x_ms_proposed_lease_id TYPE string
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_changelease
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_listblobflatsegmen,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE list_blobs_flat_segment_resp,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_listblobflatsegmen.
+  METHODS container_listblobflatsegmen
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      container_name TYPE string
+      prefix TYPE string OPTIONAL
+      marker TYPE string OPTIONAL
+      maxresults TYPE i OPTIONAL
+      include TYPE string_table OPTIONAL
+      start_from TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_listblobflatsegmen
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_listblobhierarchys,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE list_blobs_hierarchy_segment,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_listblobhierarchys.
+  METHODS container_listblobhierarchys
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      container_name TYPE string
+      prefix TYPE string OPTIONAL
+      delimiter TYPE string
+      marker TYPE string OPTIONAL
+      maxresults TYPE i OPTIONAL
+      include TYPE string_table OPTIONAL
+      start_from TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_listblobhierarchys
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_container_getaccountinfo,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_container_getaccountinfo.
+  METHODS container_getaccountinfo
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      container_name TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_container_getaccountinfo
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_download,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE xstring,
+           _206_app_xml TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_download.
+  METHODS blob_download
+    IMPORTING
+      container_name TYPE string
+      blob TYPE string
+      snapshot TYPE string OPTIONAL
+      versionid TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_range TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_range_get_content_md5 TYPE abap_bool OPTIONAL
+      x_ms_range_get_content_crc64 TYPE abap_bool OPTIONAL
+      x_ms_structured_body TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_download
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_getproperties,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_getproperties.
+  METHODS blob_getproperties
+    IMPORTING
+      container_name TYPE string
+      blob TYPE string
+      snapshot TYPE string OPTIONAL
+      versionid TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_getproperties
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_delete,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_delete.
+  METHODS blob_delete
+    IMPORTING
+      container_name TYPE string
+      blob TYPE string
+      snapshot TYPE string OPTIONAL
+      versionid TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_delete_snapshots TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      deletetype TYPE string OPTIONAL
+      x_ms_access_tier_if_modified TYPE string OPTIONAL
+      x_ms_access_tier_if_unmodifi TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_delete
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_pageblob_create,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_pageblob_create.
+  METHODS pageblob_create
+    IMPORTING
+      x_ms_blob_type TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      content__length TYPE i
+      x_ms_access_tier TYPE string OPTIONAL
+      x_ms_blob_content_type TYPE string OPTIONAL
+      x_ms_blob_content_encoding TYPE string OPTIONAL
+      x_ms_blob_content_language TYPE string OPTIONAL
+      x_ms_blob_content_md5 TYPE string OPTIONAL
+      x_ms_blob_cache_control TYPE string OPTIONAL
+      x_ms_meta TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_blob_content_dispositio TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_blob_content_length TYPE i
+      x_ms_blob_sequence_number TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_tags TYPE string OPTIONAL
+      x_ms_immutability_policy_unt TYPE string OPTIONAL
+      x_ms_immutability_policy_mod TYPE string OPTIONAL
+      x_ms_legal_hold TYPE abap_bool OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_pageblob_create
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_appendblob_create,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_appendblob_create.
+  METHODS appendblob_create
+    IMPORTING
+      x_ms_blob_type TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      content__length TYPE i
+      x_ms_blob_content_type TYPE string OPTIONAL
+      x_ms_blob_content_encoding TYPE string OPTIONAL
+      x_ms_blob_content_language TYPE string OPTIONAL
+      x_ms_blob_content_md5 TYPE string OPTIONAL
+      x_ms_blob_cache_control TYPE string OPTIONAL
+      x_ms_meta TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_blob_content_dispositio TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_tags TYPE string OPTIONAL
+      x_ms_immutability_policy_unt TYPE string OPTIONAL
+      x_ms_immutability_policy_mod TYPE string OPTIONAL
+      x_ms_legal_hold TYPE abap_bool OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_appendblob_create
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blockblob_upload,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blockblob_upload.
+  METHODS blockblob_upload
+    IMPORTING
+      x_ms_blob_type TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      content_md5 TYPE string OPTIONAL
+      content__length TYPE i
+      x_ms_blob_content_type TYPE string OPTIONAL
+      x_ms_blob_content_encoding TYPE string OPTIONAL
+      x_ms_blob_content_language TYPE string OPTIONAL
+      x_ms_blob_content_md5 TYPE string OPTIONAL
+      x_ms_blob_cache_control TYPE string OPTIONAL
+      x_ms_meta TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_blob_content_dispositio TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      x_ms_access_tier TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_tags TYPE string OPTIONAL
+      x_ms_immutability_policy_unt TYPE string OPTIONAL
+      x_ms_immutability_policy_mod TYPE string OPTIONAL
+      x_ms_legal_hold TYPE abap_bool OPTIONAL
+      x_ms_content_crc64 TYPE string OPTIONAL
+      x_ms_structured_body TYPE string OPTIONAL
+      x_ms_structured_content_leng TYPE i OPTIONAL
+      body TYPE xstring
+    RETURNING
+      VALUE(return) TYPE r_blockblob_upload
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blockblob_putblobfromurl,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blockblob_putblobfromurl.
+  METHODS blockblob_putblobfromurl
+    IMPORTING
+      x_ms_blob_type TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      content_md5 TYPE string OPTIONAL
+      content__length TYPE i
+      x_ms_blob_content_type TYPE string OPTIONAL
+      x_ms_blob_content_encoding TYPE string OPTIONAL
+      x_ms_blob_content_language TYPE string OPTIONAL
+      x_ms_blob_content_md5 TYPE string OPTIONAL
+      x_ms_blob_cache_control TYPE string OPTIONAL
+      x_ms_meta TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_blob_content_dispositio TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      x_ms_access_tier TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_source_if_modified_sinc TYPE string OPTIONAL
+      x_ms_source_if_unmodified_si TYPE string OPTIONAL
+      x_ms_source_if_match TYPE string OPTIONAL
+      x_ms_source_if_none_match TYPE string OPTIONAL
+      x_ms_source_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_source_content_md5 TYPE string OPTIONAL
+      x_ms_tags TYPE string OPTIONAL
+      x_ms_copy_source TYPE string
+      x_ms_copy_source_blob_proper TYPE abap_bool OPTIONAL
+      x_ms_copy_source_authorizati TYPE string OPTIONAL
+      x_ms_copy_source_tag_option TYPE string OPTIONAL
+      x_ms_file_request_intent TYPE string OPTIONAL
+      x_ms_source_encryption_key TYPE string OPTIONAL
+      x_ms_source_encryption_key_s TYPE string OPTIONAL
+      x_ms_source_encryption_algor TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blockblob_putblobfromurl
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_undelete,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_undelete.
+  METHODS blob_undelete
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_undelete
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_setexpiry,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_setexpiry.
+  METHODS blob_setexpiry
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_expiry_option TYPE string
+      x_ms_expiry_time TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_setexpiry
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_sethttpheaders,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_sethttpheaders.
+  METHODS blob_sethttpheaders
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_blob_cache_control TYPE string OPTIONAL
+      x_ms_blob_content_type TYPE string OPTIONAL
+      x_ms_blob_content_md5 TYPE string OPTIONAL
+      x_ms_blob_content_encoding TYPE string OPTIONAL
+      x_ms_blob_content_language TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_blob_content_dispositio TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_sethttpheaders
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_setimmutabilitypolicy,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_setimmutabilitypolicy.
+  METHODS blob_setimmutabilitypolicy
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      x_ms_immutability_policy_unt TYPE string OPTIONAL
+      x_ms_immutability_policy_mod TYPE string OPTIONAL
+      snapshot TYPE string OPTIONAL
+      versionid TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_setimmutabilitypolicy
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_deleteimmutabilitypolic,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_deleteimmutabilitypolic.
+  METHODS blob_deleteimmutabilitypolic
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      snapshot TYPE string OPTIONAL
+      versionid TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_deleteimmutabilitypolic
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_setlegalhold,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_setlegalhold.
+  METHODS blob_setlegalhold
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_legal_hold TYPE abap_bool
+      snapshot TYPE string OPTIONAL
+      versionid TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_setlegalhold
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_setmetadata,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_setmetadata.
+  METHODS blob_setmetadata
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_meta TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_setmetadata
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_acquirelease,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_acquirelease.
+  METHODS blob_acquirelease
+    IMPORTING
+      comp TYPE string
+      x_ms_lease_action TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_duration TYPE i OPTIONAL
+      x_ms_proposed_lease_id TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_acquirelease
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_releaselease,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_releaselease.
+  METHODS blob_releaselease
+    IMPORTING
+      comp TYPE string
+      x_ms_lease_action TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_releaselease
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_renewlease,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_renewlease.
+  METHODS blob_renewlease
+    IMPORTING
+      comp TYPE string
+      x_ms_lease_action TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_renewlease
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_changelease,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_changelease.
+  METHODS blob_changelease
+    IMPORTING
+      comp TYPE string
+      x_ms_lease_action TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string
+      x_ms_proposed_lease_id TYPE string
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_changelease
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_breaklease,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_breaklease.
+  METHODS blob_breaklease
+    IMPORTING
+      comp TYPE string
+      x_ms_lease_action TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_break_period TYPE i OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_breaklease
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_createsnapshot,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_createsnapshot.
+  METHODS blob_createsnapshot
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_meta TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_createsnapshot
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_startcopyfromurl,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_startcopyfromurl.
+  METHODS blob_startcopyfromurl
+    IMPORTING
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_meta TYPE string OPTIONAL
+      x_ms_access_tier TYPE string OPTIONAL
+      x_ms_rehydrate_priority TYPE string OPTIONAL
+      x_ms_source_if_modified_sinc TYPE string OPTIONAL
+      x_ms_source_if_unmodified_si TYPE string OPTIONAL
+      x_ms_source_if_match TYPE string OPTIONAL
+      x_ms_source_if_none_match TYPE string OPTIONAL
+      x_ms_source_if_tags TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_copy_source TYPE string
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_tags TYPE string OPTIONAL
+      x_ms_seal_blob TYPE abap_bool OPTIONAL
+      x_ms_immutability_policy_unt TYPE string OPTIONAL
+      x_ms_immutability_policy_mod TYPE string OPTIONAL
+      x_ms_legal_hold TYPE abap_bool OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_startcopyfromurl
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_copyfromurl,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_copyfromurl.
+  METHODS blob_copyfromurl
+    IMPORTING
+      x_ms_requires_sync TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_meta TYPE string OPTIONAL
+      x_ms_access_tier TYPE string OPTIONAL
+      x_ms_source_if_modified_sinc TYPE string OPTIONAL
+      x_ms_source_if_unmodified_si TYPE string OPTIONAL
+      x_ms_source_if_match TYPE string OPTIONAL
+      x_ms_source_if_none_match TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_copy_source TYPE string
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_source_content_md5 TYPE string OPTIONAL
+      x_ms_tags TYPE string OPTIONAL
+      x_ms_immutability_policy_unt TYPE string OPTIONAL
+      x_ms_immutability_policy_mod TYPE string OPTIONAL
+      x_ms_legal_hold TYPE abap_bool OPTIONAL
+      x_ms_copy_source_authorizati TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      x_ms_copy_source_tag_option TYPE string OPTIONAL
+      x_ms_file_request_intent TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_copyfromurl
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_abortcopyfromurl,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_abortcopyfromurl.
+  METHODS blob_abortcopyfromurl
+    IMPORTING
+      comp TYPE string
+      x_ms_copy_action TYPE string
+      container_name TYPE string
+      blob TYPE string
+      copyid TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_abortcopyfromurl
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_settier,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_settier.
+  METHODS blob_settier
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      snapshot TYPE string OPTIONAL
+      versionid TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_access_tier TYPE string
+      x_ms_rehydrate_priority TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_settier
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_getaccountinfo,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_getaccountinfo.
+  METHODS blob_getaccountinfo
+    IMPORTING
+      restype TYPE string
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_getaccountinfo
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blockblob_stageblock,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blockblob_stageblock.
+  METHODS blockblob_stageblock
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      blockid TYPE string
+      content__length TYPE i
+      content_md5 TYPE string OPTIONAL
+      x_ms_content_crc64 TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_structured_body TYPE string OPTIONAL
+      x_ms_structured_content_leng TYPE i OPTIONAL
+      body TYPE xstring
+    RETURNING
+      VALUE(return) TYPE r_blockblob_stageblock
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blockblob_stageblockfromurl,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blockblob_stageblockfromurl.
+  METHODS blockblob_stageblockfromurl
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      blockid TYPE string
+      content__length TYPE i
+      x_ms_copy_source TYPE string
+      x_ms_source_range TYPE string OPTIONAL
+      x_ms_source_content_md5 TYPE string OPTIONAL
+      x_ms_source_content_crc64 TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_source_if_modified_sinc TYPE string OPTIONAL
+      x_ms_source_if_unmodified_si TYPE string OPTIONAL
+      x_ms_source_if_match TYPE string OPTIONAL
+      x_ms_source_if_none_match TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_copy_source_authorizati TYPE string OPTIONAL
+      x_ms_file_request_intent TYPE string OPTIONAL
+      x_ms_source_encryption_key TYPE string OPTIONAL
+      x_ms_source_encryption_key_s TYPE string OPTIONAL
+      x_ms_source_encryption_algor TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blockblob_stageblockfromurl
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blockblob_commitblocklist,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blockblob_commitblocklist.
+  METHODS blockblob_commitblocklist
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_blob_cache_control TYPE string OPTIONAL
+      x_ms_blob_content_type TYPE string OPTIONAL
+      x_ms_blob_content_encoding TYPE string OPTIONAL
+      x_ms_blob_content_language TYPE string OPTIONAL
+      x_ms_blob_content_md5 TYPE string OPTIONAL
+      content_md5 TYPE string OPTIONAL
+      x_ms_content_crc64 TYPE string OPTIONAL
+      x_ms_meta TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_blob_content_dispositio TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      x_ms_access_tier TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_tags TYPE string OPTIONAL
+      x_ms_immutability_policy_unt TYPE string OPTIONAL
+      x_ms_immutability_policy_mod TYPE string OPTIONAL
+      x_ms_legal_hold TYPE abap_bool OPTIONAL
+      body TYPE block_lookup_list
+    RETURNING
+      VALUE(return) TYPE r_blockblob_commitblocklist
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blockblob_getblocklist,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE block_list,
+           _default_app_xml TYPE storage_error,
+         END OF r_blockblob_getblocklist.
+  METHODS blockblob_getblocklist
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      snapshot TYPE string OPTIONAL
+      blocklisttype TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blockblob_getblocklist
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_pageblob_uploadpages,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_pageblob_uploadpages.
+  METHODS pageblob_uploadpages
+    IMPORTING
+      comp TYPE string
+      x_ms_page_write TYPE string
+      container_name TYPE string
+      blob TYPE string
+      content__length TYPE i
+      content_md5 TYPE string OPTIONAL
+      x_ms_content_crc64 TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_range TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      x_ms_if_sequence_number_le TYPE i OPTIONAL
+      x_ms_if_sequence_number_lt TYPE i OPTIONAL
+      x_ms_if_sequence_number_eq TYPE i OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_structured_body TYPE string OPTIONAL
+      x_ms_structured_content_leng TYPE i OPTIONAL
+      body TYPE xstring
+    RETURNING
+      VALUE(return) TYPE r_pageblob_uploadpages
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_pageblob_clearpages,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_pageblob_clearpages.
+  METHODS pageblob_clearpages
+    IMPORTING
+      comp TYPE string
+      x_ms_page_write TYPE string
+      container_name TYPE string
+      blob TYPE string
+      content__length TYPE i
+      timeout TYPE i OPTIONAL
+      x_ms_range TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      x_ms_if_sequence_number_le TYPE i OPTIONAL
+      x_ms_if_sequence_number_lt TYPE i OPTIONAL
+      x_ms_if_sequence_number_eq TYPE i OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_pageblob_clearpages
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_pageblob_uploadpagesfromurl,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_pageblob_uploadpagesfromurl.
+  METHODS pageblob_uploadpagesfromurl
+    IMPORTING
+      comp TYPE string
+      x_ms_page_write TYPE string
+      container_name TYPE string
+      blob TYPE string
+      x_ms_copy_source TYPE string
+      x_ms_source_range TYPE string
+      x_ms_source_content_md5 TYPE string OPTIONAL
+      x_ms_source_content_crc64 TYPE string OPTIONAL
+      content__length TYPE i
+      timeout TYPE i OPTIONAL
+      x_ms_range TYPE string
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_if_sequence_number_le TYPE i OPTIONAL
+      x_ms_if_sequence_number_lt TYPE i OPTIONAL
+      x_ms_if_sequence_number_eq TYPE i OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_source_if_modified_sinc TYPE string OPTIONAL
+      x_ms_source_if_unmodified_si TYPE string OPTIONAL
+      x_ms_source_if_match TYPE string OPTIONAL
+      x_ms_source_if_none_match TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_copy_source_authorizati TYPE string OPTIONAL
+      x_ms_file_request_intent TYPE string OPTIONAL
+      x_ms_source_encryption_key TYPE string OPTIONAL
+      x_ms_source_encryption_key_s TYPE string OPTIONAL
+      x_ms_source_encryption_algor TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_pageblob_uploadpagesfromurl
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_pageblob_getpageranges,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE page_list,
+           _default_app_xml TYPE storage_error,
+         END OF r_pageblob_getpageranges.
+  METHODS pageblob_getpageranges
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      snapshot TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_range TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      marker TYPE string OPTIONAL
+      maxresults TYPE i OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_pageblob_getpageranges
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_pageblob_getpagerangesdiff,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE page_list,
+           _default_app_xml TYPE storage_error,
+         END OF r_pageblob_getpagerangesdiff.
+  METHODS pageblob_getpagerangesdiff
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      snapshot TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      prevsnapshot TYPE string OPTIONAL
+      x_ms_previous_snapshot_url TYPE string OPTIONAL
+      x_ms_range TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      marker TYPE string OPTIONAL
+      maxresults TYPE i OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_pageblob_getpagerangesdiff
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_pageblob_resize,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_pageblob_resize.
+  METHODS pageblob_resize
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_blob_content_length TYPE i
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_pageblob_resize
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_pageblob_updatesequencenumbe,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_pageblob_updatesequencenumbe.
+  METHODS pageblob_updatesequencenumbe
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_sequence_number_action TYPE string
+      x_ms_blob_sequence_number TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_pageblob_updatesequencenumbe
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_pageblob_copyincremental,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_pageblob_copyincremental.
+  METHODS pageblob_copyincremental
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_copy_source TYPE string
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_pageblob_copyincremental
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_appendblob_appendblock,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_appendblob_appendblock.
+  METHODS appendblob_appendblock
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      content__length TYPE i
+      content_md5 TYPE string OPTIONAL
+      x_ms_content_crc64 TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_blob_condition_maxsize TYPE i OPTIONAL
+      x_ms_blob_condition_appendpo TYPE i OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_structured_body TYPE string OPTIONAL
+      x_ms_structured_content_leng TYPE i OPTIONAL
+      body TYPE xstring
+    RETURNING
+      VALUE(return) TYPE r_appendblob_appendblock
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_appendblob_appendblockfromur,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_appendblob_appendblockfromur.
+  METHODS appendblob_appendblockfromur
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      x_ms_copy_source TYPE string
+      x_ms_source_range TYPE string OPTIONAL
+      x_ms_source_content_md5 TYPE string OPTIONAL
+      x_ms_source_content_crc64 TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      content__length TYPE i
+      content_md5 TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      x_ms_encryption_scope TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_blob_condition_maxsize TYPE i OPTIONAL
+      x_ms_blob_condition_appendpo TYPE i OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_source_if_modified_sinc TYPE string OPTIONAL
+      x_ms_source_if_unmodified_si TYPE string OPTIONAL
+      x_ms_source_if_match TYPE string OPTIONAL
+      x_ms_source_if_none_match TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_copy_source_authorizati TYPE string OPTIONAL
+      x_ms_file_request_intent TYPE string OPTIONAL
+      x_ms_source_encryption_key TYPE string OPTIONAL
+      x_ms_source_encryption_key_s TYPE string OPTIONAL
+      x_ms_source_encryption_algor TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_appendblob_appendblockfromur
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_appendblob_seal,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_appendblob_seal.
+  METHODS appendblob_seal
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_blob_condition_appendpo TYPE i OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_appendblob_seal
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_query,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE xstring,
+           _206_app_xml TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_query.
+  METHODS blob_query
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      snapshot TYPE string OPTIONAL
+      timeout TYPE i OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_encryption_key TYPE string OPTIONAL
+      x_ms_encryption_key_sha256 TYPE string OPTIONAL
+      x_ms_encryption_algorithm TYPE string OPTIONAL
+      if__modified__since TYPE string OPTIONAL
+      if__unmodified__since TYPE string OPTIONAL
+      if__match TYPE string OPTIONAL
+      if__none__match TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      body TYPE query_request
+    RETURNING
+      VALUE(return) TYPE r_blob_query
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_gettags,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _200_app_xml TYPE blob_tags,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_gettags.
+  METHODS blob_gettags
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      timeout TYPE i OPTIONAL
+      x_ms_version TYPE string
+      x_ms_client_request_id TYPE string OPTIONAL
+      snapshot TYPE string OPTIONAL
+      versionid TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_blob_if_modified_since TYPE string OPTIONAL
+      x_ms_blob_if_unmodified_sinc TYPE string OPTIONAL
+      x_ms_blob_if_match TYPE string OPTIONAL
+      x_ms_blob_if_none_match TYPE string OPTIONAL
+    RETURNING
+      VALUE(return) TYPE r_blob_gettags
+    RAISING
+      zcx_azure.
+  TYPES: BEGIN OF r_blob_settags,
+           code          TYPE i,
+           reason        TYPE string,
+           raw_body      TYPE string,
+           raw_body_bin  TYPE xstring,
+           _default_app_xml TYPE storage_error,
+         END OF r_blob_settags.
+  METHODS blob_settags
+    IMPORTING
+      comp TYPE string
+      container_name TYPE string
+      blob TYPE string
+      x_ms_version TYPE string
+      timeout TYPE i OPTIONAL
+      versionid TYPE string OPTIONAL
+      content_md5 TYPE string OPTIONAL
+      x_ms_content_crc64 TYPE string OPTIONAL
+      x_ms_client_request_id TYPE string OPTIONAL
+      x_ms_if_tags TYPE string OPTIONAL
+      x_ms_lease_id TYPE string OPTIONAL
+      x_ms_blob_if_modified_since TYPE string OPTIONAL
+      x_ms_blob_if_unmodified_sinc TYPE string OPTIONAL
+      x_ms_blob_if_match TYPE string OPTIONAL
+      x_ms_blob_if_none_match TYPE string OPTIONAL
+      body TYPE blob_tags
+    RETURNING
+      VALUE(return) TYPE r_blob_settags
+    RAISING
+      zcx_azure.
+
+  "--- ergonomic typed convenience methods ---
+"! List the blob containers in the storage account.
+  METHODS list_containers
+    IMPORTING
+      iv_prefix      TYPE string OPTIONAL
+      iv_max_results TYPE i      OPTIONAL
+      iv_marker      TYPE string OPTIONAL
+    RETURNING
+      VALUE(ro_result)
+      TYPE REF TO zcl_az_list_containers_result
+    RAISING
+      zcx_azure.
+
+  "! List the blobs inside a container (optionally filtered by prefix /
+  "! rolled up by delimiter). Supports paging via marker / next_marker.
+  METHODS list_blobs
+    IMPORTING
+      iv_container   TYPE string
+      iv_prefix      TYPE string OPTIONAL
+      iv_delimiter   TYPE string OPTIONAL
+      iv_max_results TYPE i      OPTIONAL
+      iv_marker      TYPE string OPTIONAL
+    RETURNING
+      VALUE(ro_result) TYPE REF TO zcl_az_list_blobs_result
+    RAISING
+      zcx_azure.
+
+  "! Download a blob's content (bytes) plus its key metadata.
+  METHODS download_blob
+    IMPORTING
+      iv_container TYPE string
+      iv_blob_name TYPE string
+    RETURNING
+      VALUE(ro_result) TYPE REF TO zcl_az_blob_content
+    RAISING
+      zcx_azure.
+
+  "! Upload (create/overwrite) a block blob in a single Put Blob request.
+  METHODS upload_blob
+    IMPORTING
+      iv_container    TYPE string
+      iv_blob_name    TYPE string
+      iv_content      TYPE xstring
+      iv_content_type TYPE string DEFAULT 'application/octet-stream'
+    RETURNING
+      VALUE(ro_result) TYPE REF TO zcl_az_upload_blob_result
+    RAISING
+      zcx_azure.
+ENDINTERFACE.

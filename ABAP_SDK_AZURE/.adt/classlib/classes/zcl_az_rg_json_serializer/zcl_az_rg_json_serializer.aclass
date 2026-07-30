@@ -1,0 +1,140 @@
+
+CLASS zcl_az_rg_json_serializer DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+
+CLASS-METHODS serialize_query_request
+  IMPORTING
+    iv_query            TYPE string
+    it_subscriptions    TYPE string_table OPTIONAL
+    it_managementgroups TYPE string_table OPTIONAL
+    iv_result_format    TYPE string OPTIONAL
+
+ RETURNING
+        VALUE(rv_json) TYPE string
+      RAISING
+        zcx_az_serialization_error.
+
+    CLASS-METHODS deserialize_query_result
+      IMPORTING
+        iv_json TYPE string
+      RETURNING
+        VALUE(ro_result) TYPE REF TO zcl_az_rg_query_result
+      RAISING
+        zcx_az_serialization_error.
+
+ENDCLASS.
+
+
+
+CLASS zcl_az_rg_json_serializer IMPLEMENTATION.
+
+   METHOD serialize_query_request.
+
+    TYPES: BEGIN OF ty_options,
+             resultFormat TYPE string,
+           END OF ty_options.
+
+    TYPES: BEGIN OF ty_payload,
+             subscriptions    TYPE string_table,
+             managementGroups TYPE string_table,
+             query            TYPE string,
+             options          TYPE ty_options,
+           END OF ty_payload.
+
+    DATA ls_payload TYPE ty_payload.
+
+    " Guard: query must not be empty
+    IF iv_query IS INITIAL.
+      RAISE EXCEPTION TYPE zcx_az_serialization_error
+        EXPORTING
+          iv_message = |Cannot serialize: query is empty.|.
+    ENDIF.
+
+    ls_payload-query = iv_query.
+    ls_payload-options-resultFormat = COND #(
+      WHEN iv_result_format IS INITIAL THEN 'objectArray'
+      ELSE iv_result_format ).
+
+    IF it_subscriptions IS NOT INITIAL.
+      ls_payload-subscriptions = it_subscriptions.
+    ENDIF.
+
+    IF it_managementgroups IS NOT INITIAL.
+      ls_payload-managementGroups = it_managementgroups.
+    ENDIF.
+
+    TRY.
+        /ui2/cl_json=>serialize(
+          EXPORTING
+            data        = ls_payload
+            pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+          RECEIVING
+            r_json      = rv_json ).
+
+      CATCH cx_root INTO DATA(lx_root).
+        RAISE EXCEPTION TYPE zcx_az_serialization_error
+          EXPORTING
+            iv_message = |Failed to serialize query request. { lx_root->get_text( ) }|
+            previous   = lx_root.
+    ENDTRY.
+
+    " Defensive: serializer must yield a non-empty payload
+    IF rv_json IS INITIAL.
+      RAISE EXCEPTION TYPE zcx_az_serialization_error
+        EXPORTING
+          iv_message = |Serialization produced an empty JSON payload.|.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+
+   METHOD deserialize_query_result.
+
+    TYPES: BEGIN OF ty_response,
+             totalRecords    TYPE i,
+             count           TYPE i,
+             resultTruncated TYPE abap_bool,
+             skipToken       TYPE string,
+             data            TYPE REF TO data,
+           END OF ty_response.
+
+    DATA ls_response TYPE ty_response.
+
+    " Guard: JSON payload must not be empty
+    IF iv_json IS INITIAL.
+      RAISE EXCEPTION TYPE zcx_az_serialization_error
+        EXPORTING
+          iv_message = |Cannot deserialize: JSON payload is empty.|.
+    ENDIF.
+
+    ro_result = NEW zcl_az_rg_query_result( ).
+
+    TRY.
+        /ui2/cl_json=>deserialize(
+          EXPORTING
+            json        = iv_json
+            pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+          CHANGING
+            data        = ls_response ).
+
+        ro_result->mv_total_records = ls_response-totalRecords.
+        ro_result->mv_count         = ls_response-count.
+        ro_result->mv_skip_token    = ls_response-skipToken.
+
+        APPEND iv_json TO ro_result->mt_rows.
+
+      CATCH cx_root INTO DATA(lx_root).
+        RAISE EXCEPTION TYPE zcx_az_serialization_error
+          EXPORTING
+            iv_message = |Failed to deserialize query result.|
+            previous   = lx_root.
+    ENDTRY.
+
+  ENDMETHOD.
+
+ENDCLASS.

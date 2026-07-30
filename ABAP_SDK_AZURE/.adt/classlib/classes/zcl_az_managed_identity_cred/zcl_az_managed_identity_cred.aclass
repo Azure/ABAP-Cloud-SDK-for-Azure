@@ -1,0 +1,123 @@
+CLASS zcl_az_managed_identity_cred DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
+
+  PUBLIC SECTION.
+    INTERFACES zif_az_token_credential.
+
+    METHODS constructor
+      IMPORTING io_http_client TYPE REF TO zif_az_http_client OPTIONAL.
+
+    METHODS set_client_id
+      IMPORTING iv_client_id TYPE string.
+
+  PRIVATE SECTION.
+    DATA mv_client_id TYPE string.
+    DATA mo_http_client TYPE REF TO zif_az_http_client.
+
+ENDCLASS.
+
+
+
+CLASS ZCL_AZ_MANAGED_IDENTITY_CRED IMPLEMENTATION.
+
+  METHOD constructor.
+    mo_http_client = io_http_client.
+  ENDMETHOD.
+
+  METHOD set_client_id.
+    mv_client_id = iv_client_id.
+  ENDMETHOD.
+
+  METHOD zif_az_token_credential~get_token.
+
+    DATA: lv_url      TYPE string,
+          lt_headers  TYPE STANDARD TABLE OF string,
+          lv_response TYPE string.
+
+    DATA: ls_token TYPE zcl_az_token_response=>ty_response.
+
+    " Guard: scope (resource) must be present
+    IF iv_scope IS INITIAL.
+      RAISE EXCEPTION TYPE zcx_az_auth_error
+        EXPORTING
+          iv_message = |Cannot authenticate: scope is empty.|.
+    ENDIF.
+
+    lv_url =
+      |http://169.254.169.254/metadata/identity/oauth2/token| &&
+      |?resource={ iv_scope }&api-version=2018-02-01|.
+
+    " Optional: user-assigned managed identity
+    IF mv_client_id IS NOT INITIAL.
+      lv_url = lv_url && |&client_id={ mv_client_id }|.
+    ENDIF.
+
+    APPEND 'Metadata:true' TO lt_headers.
+
+    " Build the HTTP request for the SDK transport pipeline
+    DATA(lo_request) = NEW zcl_az_http_request( ).
+    lo_request->mv_method  = 'GET'.
+    lo_request->mv_url     = lv_url.
+    lo_request->mt_headers = lt_headers.
+
+    DATA lo_http_client TYPE REF TO zif_az_http_client.
+    lo_http_client = COND #( WHEN mo_http_client IS BOUND
+                             THEN mo_http_client
+                             ELSE NEW zcl_az_http_client( ) ).
+
+    TRY.
+        DATA(lo_response) = lo_http_client->send( lo_request ).
+
+        " Defensive: transport must return a bound response
+        IF lo_response IS NOT BOUND.
+          RAISE EXCEPTION TYPE zcx_az_auth_error
+            EXPORTING
+              iv_message = |IMDS endpoint returned no response.|.
+        ENDIF.
+
+        " IMDS must answer with a successful status
+        IF lo_response->is_success( ) <> abap_true.
+          RAISE EXCEPTION TYPE zcx_az_auth_error
+            EXPORTING
+              iv_message = |Token request failed (HTTP { lo_response->get_status_code( ) }): { lo_response->get_body( ) }|.
+        ENDIF.
+
+        lv_response = lo_response->get_body( ).
+
+        " Defensive: transport must return a payload
+        IF lv_response IS INITIAL.
+          RAISE EXCEPTION TYPE zcx_az_auth_error
+            EXPORTING
+              iv_message = |IMDS endpoint returned an empty response.|.
+        ENDIF.
+
+        /ui2/cl_json=>deserialize(
+          EXPORTING json = lv_response
+          CHANGING  data = ls_token ).
+
+        " Defensive: a valid token must be present
+        IF ls_token-access_token IS INITIAL.
+          RAISE EXCEPTION TYPE zcx_az_auth_error
+            EXPORTING
+              iv_message = |Authentication failed: no access token returned from IMDS.|.
+        ENDIF.
+
+        ro_token = NEW zcl_az_access_token(
+                         iv_token      = ls_token-access_token
+                         iv_expires_in = ls_token-expires_in ).
+
+      CATCH zcx_az_auth_error INTO DATA(lx_auth).
+        RAISE EXCEPTION lx_auth.
+
+      CATCH cx_root INTO DATA(lx_root).
+        RAISE EXCEPTION TYPE zcx_az_auth_error
+          EXPORTING
+            iv_message = |Unexpected error while acquiring access token. { lx_root->get_text( ) }|
+            previous   = lx_root.
+    ENDTRY.
+
+  ENDMETHOD.
+
+ENDCLASS.
