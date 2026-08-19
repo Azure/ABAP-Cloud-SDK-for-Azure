@@ -1,3 +1,6 @@
+* Copyright (c) Microsoft Corporation.
+* Licensed under the MIT license.
+
 CLASS zcx_azure DEFINITION
   PUBLIC
   INHERITING FROM cx_static_check

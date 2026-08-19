@@ -1,3 +1,6 @@
+* Copyright (c) Microsoft Corporation.
+* Licensed under the MIT license.
+
 INTERFACE zif_az_resourcegraph_service PUBLIC.
 * Title: Azure Resource Graph
 * Description: Azure Resource Graph API Reference

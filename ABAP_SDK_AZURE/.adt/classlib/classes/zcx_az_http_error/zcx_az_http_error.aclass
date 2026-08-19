@@ -1,3 +1,6 @@
+* Copyright (c) Microsoft Corporation.
+* Licensed under the MIT license.
+
 CLASS zcx_az_http_error DEFINITION
   PUBLIC
   INHERITING FROM zcx_azure

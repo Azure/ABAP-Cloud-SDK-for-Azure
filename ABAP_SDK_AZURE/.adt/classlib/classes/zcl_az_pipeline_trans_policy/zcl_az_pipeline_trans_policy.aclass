@@ -1,3 +1,6 @@
+* Copyright (c) Microsoft Corporation.
+* Licensed under the MIT license.
+
 CLASS zcl_az_pipeline_trans_policy DEFINITION
 PUBLIC
   FINAL
