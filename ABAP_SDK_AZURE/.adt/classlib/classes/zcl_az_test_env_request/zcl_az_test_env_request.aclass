@@ -1,3 +1,6 @@
+* Copyright (c) Microsoft Corporation.
+* Licensed under the MIT license.
+
  "! Parameterizable description of a compute test environment — set the public
  "! attributes you care about and pass it to the helpers / client calls.
 

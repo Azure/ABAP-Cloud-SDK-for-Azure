@@ -1,3 +1,6 @@
+* Copyright (c) Microsoft Corporation.
+* Licensed under the MIT license.
+
 INTERFACE zif_az_http_client PUBLIC.
 
   METHODS send
