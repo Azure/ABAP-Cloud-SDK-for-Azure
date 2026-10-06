@@ -1,16 +1,16 @@
 # ABAP Cloud SDK for Azure
 
-An enterprise-grade SDK that lets **ABAP Cloud** (SAP BAIP ABAP Environment / S/4HANA Cloud) applications
+An enterprise-grade SDK that lets **ABAP Cloud** (SAP Business AI Platform, ABAP environment / S/4HANA Cloud) applications
 call **Azure REST APIs** with the same ergonomics you expect from the official Azure SDKs for Java or .NET:
 a layered HTTP **pipeline**, pluggable **credentials**, typed **exceptions**, and strongly-typed service
 clients — all written in released, cloud-ready ABAP (`ABAP for Cloud Development`, language version 5).
 
-> **Built for Steampunk.** This SDK is designed from the ground up to be **ABAP Cloud–compliant**: it
-> targets **SAP BAIP ABAP Environment (a.k.a. "Steampunk") and S/4HANA Cloud Public Edition**, and uses only
+> **Built for ABAP Cloud.** This SDK is designed from the ground up to be **ABAP Cloud–compliant**: it
+> targets **SAP Business AI Platform, ABAP environment and S/4HANA Cloud Public Edition**, and uses only
 > released, cloud-ready APIs. It is a fresh, cloud-native counterpart to the established
 > [**microsoft/ABAP-SDK-for-Azure**](https://github.com/microsoft/ABAP-SDK-for-Azure) — the classic SDK for
 > **classic / on-premises ABAP** (SAP NetWeaver, S/4HANA on-prem). The two are complementary: pick the
-> classic SDK for classic ABAP stacks, and this one when you run on ABAP Cloud / Steampunk.
+> classic SDK for classic ABAP stacks, and this one when you run on ABAP Cloud.
 
 > **🌱 Initial release (v0.1 · public preview / MVP) — we want your feedback.**
 > This is the **first public release** and an intentional starting point, not a finished product. It covers
@@ -246,7 +246,7 @@ Dictionary: table `zaz_config` (environment-credential configuration). Message c
 
 ### Prerequisites
 
-- SAP BAIP ABAP Environment or S/4HANA Cloud (public/private) with **ABAP for Cloud Development**.
+- SAP Business AI Platform, ABAP environment or S/4HANA Cloud (public/private) with **ABAP for Cloud Development**.
 - Outbound HTTP connectivity / communication arrangement to the relevant Azure endpoints
   (`login.microsoftonline.com`, `management.azure.com`, `*.blob.core.windows.net`, IMDS for Managed Identity).
 - An Azure identity. In order of preference: a **Microsoft Entra ID identity** (a service principal or a

@@ -17,7 +17,7 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 This repository is a file-system export of ABAP Development Tools (ADT) objects for an ABAP Cloud SDK.
 
 1. **Fork** the repository and create a topic branch from `main`.
-2. **Develop in ABAP Cloud** — import the objects into an SAP BAIP ABAP Environment / S/4HANA Cloud system
+2. **Develop in ABAP Cloud** — import the objects into an SAP Business AI Platform, ABAP environment / S/4HANA Cloud system
    (ABAP for Cloud Development, language version 5) via ADT or abapGit.
 3. **Follow the existing conventions** (see the "Design principles & conventions" section of the README):
    typed `zcx_azure` exceptions, the pipeline/policy pattern, the `io_http_client` injection seam, and
