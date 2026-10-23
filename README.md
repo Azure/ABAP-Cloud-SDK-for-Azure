@@ -12,7 +12,7 @@ clients — all written in released, cloud-ready ABAP (`ABAP for Cloud Developme
 > **classic / on-premises ABAP** (SAP NetWeaver, S/4HANA on-prem). The two are complementary: pick the
 > classic SDK for classic ABAP stacks, and this one when you run on ABAP Cloud.
 
-> **🌱 Initial release (v0.1 · public preview / MVP) — we want your feedback.**
+> **🌱 Initial release (MVP) — we want your feedback.**
 > This is the **first public release** and an intentional starting point, not a finished product. It covers
 > three Azure services end-to-end (Storage Blob, Compute, Resource Graph) on a shared runtime core, with
 > **182 ABAP Unit tests**. We are publishing it **early and openly so the ABAP Cloud community can try it,
@@ -377,7 +377,7 @@ tests, and **never commit real credentials, account names, SAS tokens, or accoun
 
 ### Feedback
 
-As an initial preview/MVP release, feedback is especially valuable. Please open a
+As an initial MVP release, feedback is especially valuable. Please open a
 **GitHub issue** to report bugs, request additional Azure services or operations, or suggest improvements
 to the design and ergonomics. Real-world usage reports — what worked, what was missing — directly inform
 the path to a stable 1.0.
