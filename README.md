@@ -255,8 +255,8 @@ Dictionary: table `zaz_config` (environment-credential configuration). Message c
 
 ### Import
 
-The repository is a file-system export of ABAP Development Tools (ADT) objects. Import it into your ABAP
-Cloud system with ADT / abapGit, then activate. Activate the `ZABAP_AZ_CORE*` packages first (services
+The repository is in [abapGit](https://abapgit.org) format. Import it into your ABAP Cloud system with
+abapGit, then activate. Activate the `ZABAP_AZ_CORE*` packages first (services
 depend on them).
 
 ### Example — recommended: blob access with a User Delegation SAS

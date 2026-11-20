@@ -456,7 +456,10 @@ Desktop.ini
 secrets.*
 *.secret
 
-# The exported ABAP ADT object tree must be committed in full. Override any
+# The repo uses the abapGit layout only - never commit an ADT file-system export.
+.adt/
+
+# The abapGit object tree (/src) must be committed in full. Override any
 # VS-template rule (e.g. **/[Pp]ackages/*, [Bb]in/, [Oo]bj/, *.log) that would
-# otherwise drop parts of it (notably .adt/wbobj/packages/).
-!ABAP_SDK_AZURE/**
+# otherwise drop parts of it.
+!/src/**

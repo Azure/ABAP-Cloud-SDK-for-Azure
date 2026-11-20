@@ -14,11 +14,12 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 ## How to contribute
 
-This repository is a file-system export of ABAP Development Tools (ADT) objects for an ABAP Cloud SDK.
+The repository uses the [abapGit](https://abapgit.org) layout (`/.abapgit.xml` + `/src`, folder logic
+`FULL`). Change the objects in an ABAP system and let abapGit serialize them — do not hand-edit the XML files.
 
 1. **Fork** the repository and create a topic branch from `main`.
-2. **Develop in ABAP Cloud** — import the objects into an SAP Business AI Platform, ABAP environment / S/4HANA Cloud system
-   (ABAP for Cloud Development, language version 5) via ADT or abapGit.
+2. **Develop in ABAP Cloud** — link your fork to a root package with abapGit (see the README), pull, and
+   develop in a system that supports ABAP for Cloud Development (language version 5).
 3. **Follow the existing conventions** (see the "Design principles & conventions" section of the README):
    typed `zcx_azure` exceptions, the pipeline/policy pattern, the `io_http_client` injection seam, and
    cloud-released APIs only.
@@ -27,4 +28,7 @@ This repository is a file-system export of ABAP Development Tools (ADT) objects 
    put live checks in self-skipping integration tests. Never commit real credentials, account names,
    SAS tokens, or account keys.
 5. **Run the full ABAP Unit suite** and ensure it is green before opening a pull request.
-6. **Open a pull request** with a clear description of the change and the tests you added or ran.
+6. **Stage and push with abapGit** — commit only the objects you changed to your topic branch. New source
+   files start with the MIT header (`* Copyright (c) Microsoft Corporation.` /
+   `* Licensed under the MIT license.`).
+7. **Open a pull request** with a clear description of the change and the tests you added or ran.

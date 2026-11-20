@@ -1,0 +1,3 @@
+# abapGit layout: keep LF on every platform (abapGit serializes with LF)
+/src/**       text eol=lf
+/.abapgit.xml text eol=lf
