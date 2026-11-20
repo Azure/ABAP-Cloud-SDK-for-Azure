@@ -220,20 +220,22 @@ and secret/SAS are configured in `zcl_az_test_environment`, so the suite is gree
 ```
 ZABAP_SDK_AZURE                     (root)
 ├── ZABAP_AZ_CORE                   HTTP pipeline, transport, crypto, serialization, exceptions, models
-│   ├── ZABAP_AZ_CORE_HTTP          zcl_az_http_client / _request / _response
-│   ├── ZABAP_AZ_CORE_PIPELINE      zcl_az_http_pipeline / _pipeline_context / _trans_policy
-│   ├── ZABAP_AZ_CORE_POLICIES      zcl_az_policy_retry / _auth / _logging / _sas / _shared_key
+│   ├── ZABAP_AZ_CORE_HTTP          zif_az_http_client, zcl_az_http_client / _request / _response
+│   ├── ZABAP_AZ_CORE_PIPELINE      zif_az_http_pipeline_policy, zcl_az_http_pipeline / _pipeline_context
+│   ├── ZABAP_AZ_CORE_POLICIES      zcl_az_pipeline_trans_policy, zcl_az_policy_retry / _auth / _logging / _sas / _shared_key
 │   ├── ZABAP_AZ_CORE_SERIALIZATION zcl_az_crypto, zcl_az_blob_xml_deserializer, zcl_az_rg_json_serializer
-│   ├── ZABAP_AZ_CORE_MODELS        result / DTO classes
-│   └── ZABAP_AZ_CORE_EXCEPTION     zcx_azure hierarchy
+│   ├── ZABAP_AZ_CORE_MODELS        (reserved, currently empty)
+│   └── ZABAP_AZ_CORE_EXCEPTION     zcx_azure hierarchy, message classes zazure_auth / zazure_error / zazure_http_error
 ├── ZABAP_AZ_IDENTITY               credentials + token model
-│   ├── ZABAP_AZ_IDENTITY_CREDENTIAL zcl_az_client_secret_cred / _managed_identity_cred / _environment_credential / _default_credential
-│   └── ZABAP_AZ_IDENTITY_TOKEN     zcl_az_access_token / zcl_az_token_response
+│   ├── ZABAP_AZ_IDENTITY_CREDENTIAL zif_az_token_credential, zcl_az_client_secret_cred / _managed_identity_cred / _environment_credential / _default_credential / _default_cred_builder, table zaz_config
+│   ├── ZABAP_AZ_IDENTITY_TOKEN     zcl_az_access_token / zcl_az_token_response
+│   ├── ZABAP_AZ_IDENTITY_CACHE     (reserved, currently empty)
+│   └── ZABAP_AZ_IDENTITY_HELPER    (reserved, currently empty)
 ├── ZABAP_AZ_SERVICES
 │   ├── ZABAP_AZ_STORAGE            zcl_az_blob_client, zif_az_blob_service, zcl_az_blob_udk_sas, blob models
 │   ├── ZABAP_AZ_COMPUTE            zcl_az_compute_client, zif_az_compute_service
 │   └── ZABAP_AZ_RESOURCEGRAPH      zcl_az_resourcegraph_client, zif_az_resourcegraph_service, RG models
-├── ZABAP_AZ_TEST                   reusable test doubles + fixtures (zcl_az_http_client_mock, zcl_az_token_credential_fake, zcl_az_test_environment, zcl_az_test_env_request)
+├── ZABAP_AZ_TEST                   test doubles + fixtures (zcl_az_http_client_mock, zcl_az_token_credential_fake, zcl_az_test_environment, zcl_az_test_env_request) and client tests (zcl_az_blob_client_test, zcl_az_compute_client_test, zcl_az_rg_client_test)
 └── ZABAP_AZ_DEMO                   runnable example classes (zcl_az_demo_blob_ops, zcl_az_demo_compute_vm, zcl_az_demo_rg_quer)
 ```
 
